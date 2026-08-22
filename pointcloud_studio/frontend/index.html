@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PointCloud Studio</title>
+<style>
+  :root { --bg:#0e1116; --panel:#171b22; --panel2:#1e242e; --line:#2b323d;
+          --txt:#e6e9ef; --dim:#9aa4b2; --accent:#4c8dff; --accent2:#39c07a;
+          --danger:#e05656; --warn:#d8a53a; }
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; overflow:hidden;
+    font-family: system-ui, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--txt); }
+  #app { display:grid; grid-template-columns: 1fr 300px; grid-template-rows: 44px 1fr;
+         height:100vh; }
+  header { grid-column:1/3; display:flex; align-items:center; gap:6px; padding:0 10px;
+    background:var(--panel); border-bottom:1px solid var(--line); }
+  header .logo { font-weight:700; margin-right:8px; font-size:14px; }
+  header .logo span { color:var(--accent); }
+  .btn { background:var(--panel2); color:var(--txt); border:1px solid var(--line);
+    border-radius:6px; padding:5px 9px; font-size:12px; cursor:pointer; white-space:nowrap; }
+  .btn:hover { border-color:var(--accent); }
+  .btn.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.danger:hover { border-color:var(--danger); color:var(--danger); }
+  .sep { width:1px; height:22px; background:var(--line); margin:0 4px; }
+  .grp { display:flex; gap:4px; align-items:center; }
+  .grp.seg .btn { border-radius:0; }
+  .grp.seg .btn:first-child { border-radius:6px 0 0 6px; }
+  .grp.seg .btn:last-child { border-radius:0 6px 6px 0; }
+  #viewport { position:relative; overflow:hidden; }
+  #viewport canvas { display:block; }
+  #selbox { position:absolute; border:1.5px dashed var(--accent); background:rgba(76,141,255,.12);
+    pointer-events:none; display:none; z-index:5; }
+  #hint { position:absolute; left:12px; bottom:12px; font-size:12px; color:var(--dim);
+    background:rgba(0,0,0,.45); padding:5px 9px; border-radius:6px; z-index:4; pointer-events:none;}
+  #drop { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:14px; z-index:6; background:rgba(14,17,22,.85); text-align:center; }
+  #drop.hide { display:none; }
+  #drop .big { font-size:19px; font-weight:600; }
+  #drop .dim { color:var(--dim); font-size:13px; max-width:360px; }
+  #drop.over { background:rgba(76,141,255,.18); outline:3px dashed var(--accent); outline-offset:-14px; }
+  aside { background:var(--panel); border-left:1px solid var(--line); overflow-y:auto; padding:12px; }
+  aside h3 { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim);
+    margin:16px 0 7px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+  aside h3:first-child { margin-top:0; }
+  .stat { display:flex; justify-content:space-between; font-size:12.5px; padding:2px 0; }
+  .stat .v { font-variant-numeric:tabular-nums; color:#fff; font-weight:600; }
+  .ctl { margin:8px 0; }
+  .ctl label { font-size:12px; color:var(--dim); display:flex; justify-content:space-between; }
+  .ctl input[type=range] { width:100%; }
+  .row { display:flex; gap:6px; margin:7px 0; }
+  .row .btn { flex:1; text-align:center; }
+  #analysis { font-size:12px; line-height:1.5; }
+  #analysis .k { color:var(--dim); }
+  #analysis .val { color:#fff; font-weight:600; }
+  #analysis .good { color:var(--accent2); }
+  #analysis .warn { color:var(--warn); }
+  .empty { color:var(--dim); font-size:12px; font-style:italic; }
+  #toast { position:absolute; top:52px; left:50%; transform:translateX(-50%);
+    background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 14px;
+    font-size:13px; z-index:10; display:none; box-shadow:0 6px 24px rgba(0,0,0,.4); }
+  #toast.err { border-color:var(--danger); color:#ffb4b4; }
+  input[type=file] { display:none; }
+  .small { font-size:11px; color:var(--dim); }
+  .lyr { display:flex; align-items:center; gap:6px; font-size:12px; padding:3px 0;
+    border-bottom:1px solid var(--line); }
+  .lyr:last-child { border-bottom:none; }
+  .lyr .eye { cursor:pointer; width:14px; text-align:center; user-select:none; }
+  .lyr .nm { flex:1; cursor:pointer; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; }
+  .lyr.aktif .nm { font-weight:700; color:#fff; }
+  .lyr .cnt { color:var(--dim); font-variant-numeric:tabular-nums; font-size:11px; }
+  .lyr .x { cursor:pointer; color:var(--dim); padding:0 2px; }
+  .lyr .x:hover { color:var(--danger); }
+  .lyr.mati .nm, .lyr.mati .cnt { opacity:.45; }
+  /* Panel Grid & Ukuran */
+  .fld { display:flex; align-items:center; gap:5px; margin:5px 0; font-size:12px;
+    color:var(--dim); }
+  .fld > span { min-width:52px; }
+  .num { width:100%; min-width:0; background:var(--panel2); color:var(--txt);
+    border:1px solid var(--line); border-radius:5px; padding:3px 5px; font-size:12px;
+    font-variant-numeric:tabular-nums; }
+  .num:focus { outline:none; border-color:var(--accent); }
+  select.num { padding:3px 4px; }
+  #gridBody.mati { opacity:.4; pointer-events:none; }
+  .note { font-size:11px; color:var(--warn); margin-top:4px; }
+  .ukr { display:flex; align-items:center; gap:6px; font-size:12px; padding:3px 0;
+    border-bottom:1px solid var(--line); cursor:default; }
+  .ukr:last-of-type { border-bottom:none; }
+  .ukr:hover { background:rgba(76,141,255,.10); }
+  .ukr .no { color:var(--dim); min-width:22px; }
+  .ukr .tp { color:var(--dim); min-width:34px; font-size:11px; }
+  .ukr .vl { flex:1; text-align:right; font-variant-numeric:tabular-nums;
+    color:#fff; font-weight:600; }
+  .ukr .x { cursor:pointer; color:var(--dim); padding:0 2px; }
+  .ukr .x:hover { color:var(--danger); }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "/static/vendor/three.module.js",
+  "three/addons/controls/OrbitControls.js": "/static/vendor/OrbitControls.js",
+  "three/addons/controls/TransformControls.js": "/static/vendor/TransformControls.js"
+}}
+</script>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">PointCloud <span>Studio</span></div>
+    <button class="btn" id="btnOpen">📂 Buka</button>
+    <input type="file" id="file" accept=".ply,.xyz,.txt,.asc" multiple>
+    <div class="sep"></div>
+    <div class="grp seg" title="Mode tampilan">
+      <button class="btn on" id="mPoints">● Titik</button>
+      <button class="btn" id="mDense">■ Padat</button>
+      <button class="btn" id="mMesh">▲ Mesh</button>
+    </div>
+    <div class="sep"></div>
+    <button class="btn" id="tSelect" title="Tarik kotak untuk memilih titik">▭ Pilih area</button>
+    <button class="btn" id="tMeasure" title="Klik untuk menancapkan ujung, klik lagi untuk mengunci">📏 Ukur</button>
+    <button class="btn" id="tGrid" title="Grid referensi yang bisa digeser & diputar">▦ Grid</button>
+    <div class="sep"></div>
+    <button class="btn" id="btnUndo" title="Batalkan hapus terakhir">↶ Undo</button>
+    <div class="sep"></div>
+    <div class="grp" title="Sudut pandang">
+      <button class="btn" id="vTop">Atas</button>
+      <button class="btn" id="vFront">Depan</button>
+      <button class="btn" id="vSide">Samping</button>
+      <button class="btn" id="vOrtho" title="Proyeksi ortografis (matikan perspektif)">Ortho</button>
+    </div>
+  </header>
+
+  <div id="viewport">
+    <div id="selbox"></div>
+    <div id="hint"></div>
+    <div id="drop">
+      <div class="big">Tarik file <b>.ply</b> / <b>.xyz</b> ke sini</div>
+      <div class="dim">atau klik "Buka" di atas. Semua diproses lokal di laptopmu — tidak diunggah ke mana pun.</div>
+      <button class="btn" id="btnOpen2">📂 Pilih file</button>
+    </div>
+    <div id="toast"></div>
+  </div>
+
+  <aside>
+    <h3>Layer</h3>
+    <div id="layerList"><div class="empty">Belum ada layer.</div></div>
+    <button class="btn" id="btnFrame" style="width:100%;margin-top:6px"
+      title="Frame ulang kamera ke semua layer yang terlihat">⤢ Sesuaikan pandangan</button>
+    <div class="small" style="margin-top:5px">Edit &amp; ekspor berlaku ke layer aktif;
+      statistik, mesh, dan analisis memakai gabungan yang terlihat.</div>
+
+    <h3>Statistik</h3>
+    <div class="stat"><span>Jumlah titik</span><span class="v" id="sN">–</span></div>
+    <div class="stat"><span>Panjang (X)</span><span class="v" id="sX">–</span></div>
+    <div class="stat"><span>Lebar (Y)</span><span class="v" id="sY">–</span></div>
+    <div class="stat"><span>Tinggi (Z)</span><span class="v" id="sZ">–</span></div>
+
+    <h3>Mode Pilih Area</h3>
+    <div class="row">
+      <button class="btn on" id="selDelete">Hapus di dalam</button>
+      <button class="btn" id="selCrop">Simpan di dalam</button>
+    </div>
+    <div class="small">Aktifkan "▭ Pilih area", lalu tarik kotak di viewport.</div>
+
+    <h3>Irisan Ketinggian (Z)</h3>
+    <div class="ctl">
+      <label>Bawah <span id="loVal">–</span></label>
+      <input type="range" id="sliceLo" min="0" max="1000" value="0">
+    </div>
+    <div class="ctl">
+      <label>Atas <span id="hiVal">–</span></label>
+      <input type="range" id="sliceHi" min="0" max="1000" value="1000">
+    </div>
+    <div class="small">Geser untuk menyembunyikan atap/lantai.</div>
+
+    <h3>Grid Referensi</h3>
+    <button class="btn" id="gridOn" style="width:100%">▦ Aktifkan grid</button>
+    <div id="gridBody" class="mati">
+      <div class="row" style="margin-top:7px">
+        <button class="btn on" id="gzMove" title="Seret panah untuk menggeser">Geser</button>
+        <button class="btn" id="gzRot" title="Seret cincin untuk memutar">Putar</button>
+        <button class="btn" id="gzOff" title="Sembunyikan gizmo">Mati</button>
+      </div>
+      <div class="small" id="gzTahan" style="display:none">
+        Gizmo ditahan selama mode Ukur — matikan "📏 Ukur" untuk menyetel grid.</div>
+      <label class="fld" title="Kunci geseran ke kelipatan spasi, putaran ke 15°">
+        <input type="checkbox" id="gzSnap" checked style="width:auto"> Snap gizmo
+      </label>
+      <div class="fld"><span>Spasi</span>
+        <select class="num" id="gSpasi">
+          <option value="0.05">5 cm</option>
+          <option value="0.1" selected>10 cm</option>
+          <option value="0.25">25 cm</option>
+          <option value="0.5">50 cm</option>
+          <option value="1">1 m</option>
+        </select></div>
+      <div class="fld"><span>Ukuran</span>
+        <input class="num" type="number" id="gUkuran" step="1" min="1" max="200"> m</div>
+      <div class="fld"><span>Posisi</span>
+        <input class="num" type="number" id="gPX" step="0.01">
+        <input class="num" type="number" id="gPY" step="0.01">
+        <input class="num" type="number" id="gPZ" step="0.01"></div>
+      <div class="fld"><span>Putar Z</span>
+        <input class="num" type="number" id="gRZ" step="0.5"> °</div>
+      <div class="fld"><span>Miring</span>
+        <input class="num" type="number" id="gRX" step="0.5">
+        <input class="num" type="number" id="gRY" step="0.5"> °</div>
+      <div id="gNote"></div>
+      <button class="btn" id="gPasang3" style="width:100%;margin-top:6px">
+        📐 Pasang di 3 titik</button>
+      <select class="num" id="gBidang" style="margin-top:6px">
+        <option value="">Bidang RANSAC — belum dianalisis</option>
+      </select>
+      <div class="row">
+        <button class="btn" id="gDatar" title="Kembalikan rotasi ke nol">Datar (XY)</button>
+        <button class="btn" id="gPusat" title="Pindahkan ke pusat data">Ke pusat data</button>
+      </div>
+    </div>
+
+    <h3>Ukuran</h3>
+    <div class="fld"><span>Snap</span>
+      <button class="btn on" id="uSnapTitik" style="flex:1" title="Nempel ke titik cloud">Titik</button>
+      <button class="btn" id="uSnapGrid" style="flex:1" title="Mendarat di bidang grid">Grid</button></div>
+    <div class="fld"><span>Tipe</span>
+      <button class="btn on" id="uJarak" style="flex:1" title="2 klik">Jarak</button>
+      <button class="btn" id="uSudut" style="flex:1" title="3 klik, sudut di titik tengah">Sudut</button></div>
+    <div id="ukurList" style="margin-top:6px"><div class="empty">Belum ada ukuran.</div></div>
+    <div class="row">
+      <button class="btn" id="uHapus">Hapus semua</button>
+      <button class="btn" id="uCsv">💾 CSV</button>
+    </div>
+
+    <h3>Tampilan Mesh</h3>
+    <div class="ctl">
+      <label>Kerapatan sudut <span id="resVal">0.5°</span></label>
+      <input type="range" id="meshRes" min="2" max="20" value="5">
+      <div class="small">Kecil = lebih halus (lebih berat).</div>
+    </div>
+
+    <h3>Analisis Ruangan</h3>
+    <button class="btn" id="btnAnalyze" style="width:100%">🔬 Analisis dimensi (RANSAC)</button>
+    <div id="analysis" style="margin-top:8px"><div class="empty">Belum dianalisis.</div></div>
+
+    <h3>Ekspor</h3>
+    <div class="row">
+      <button class="btn" id="expPly">💾 PLY</button>
+      <button class="btn" id="expXyz">💾 XYZ</button>
+    </div>
+    <div class="small">Menyimpan hasil editan (file asli tak tersentuh).</div>
+  </aside>
+</div>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>

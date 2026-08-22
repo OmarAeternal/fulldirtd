@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Panduan Validasi Data — 3D LiDAR Scanner</title>
+<style>
+  @page { size: A4; margin: 17mm 15mm 16mm 15mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+    font-size: 10pt; line-height: 1.5; color: #1a1a1a; margin: 0;
+  }
+  h1 { font-size: 19pt; margin: 0 0 2mm; color: #10375c; letter-spacing: -0.2pt; }
+  .sub { font-size: 10.5pt; color: #555; margin-bottom: 6mm; }
+  h2 {
+    font-size: 13pt; color: #fff; background: #10375c;
+    padding: 2.2mm 3mm; margin: 8mm 0 3mm; border-radius: 2px;
+    page-break-after: avoid;
+  }
+  h3 { font-size: 11pt; color: #10375c; margin: 5mm 0 2mm;
+       border-left: 3px solid #2f7fbf; padding-left: 2.5mm; page-break-after: avoid; }
+  h4 { font-size: 10pt; color: #333; margin: 3.5mm 0 1.5mm; page-break-after: avoid; }
+  p { margin: 0 0 2.5mm; text-align: justify; }
+  ul, ol { margin: 0 0 2.5mm; padding-left: 5mm; }
+  li { margin-bottom: 1.2mm; }
+  table {
+    width: 100%; max-width: 100%; table-layout: fixed;
+    border-collapse: collapse; margin: 2.5mm 0 4mm;
+    font-size: 9pt; page-break-inside: avoid;
+  }
+  th, td { word-wrap: break-word; overflow-wrap: break-word; hyphens: auto; }
+  th {
+    background: #e8eef5; color: #10375c; text-align: left;
+    padding: 1.8mm 2.2mm; border: 0.4pt solid #a8bcd0; font-weight: bold;
+  }
+  td { padding: 1.6mm 2.2mm; border: 0.4pt solid #c4d2df; vertical-align: top; }
+  tr:nth-child(even) td { background: #f7f9fb; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ctr { text-align: center; }
+  .formula {
+    background: #f4f7fa; border: 0.4pt solid #c4d2df; border-left: 2.5pt solid #2f7fbf;
+    padding: 2.5mm 3.5mm; margin: 2.5mm 0 3mm; page-break-inside: avoid;
+    font-size: 10pt;
+  }
+  .formula .eq {
+    text-align: center; font-family: "DejaVu Serif", Georgia, serif;
+    font-style: italic; font-size: 11.5pt; margin: 1.5mm 0; color: #10375c;
+  }
+  .formula .ket { font-size: 8.5pt; color: #444; margin-top: 1.5mm; line-height: 1.45; }
+  .box {
+    border: 0.4pt solid #c9c2a6; background: #fdfaef; border-left: 2.5pt solid #c9a227;
+    padding: 2.5mm 3.5mm; margin: 3mm 0; page-break-inside: avoid; font-size: 9.5pt;
+  }
+  .box.find { border-color: #a8c9a8; background: #f2f8f2; border-left-color: #3d8b3d; }
+  .box.warn { border-color: #d9b0b0; background: #fcf4f4; border-left-color: #b03030; }
+  .box .t { font-weight: bold; display: block; margin-bottom: 1.2mm; color: #10375c; }
+  .box.find .t { color: #2b6b2b; }
+  .box.warn .t { color: #8b2020; }
+  code { font-family: "DejaVu Sans Mono", Consolas, monospace; font-size: 8.6pt;
+         background: #eef1f4; padding: 0.4mm 1.2mm; border-radius: 2px; }
+  .lead { font-size: 10.5pt; color: #333; background: #f4f7fa;
+          padding: 3mm 4mm; border-radius: 3px; margin-bottom: 5mm; }
+  .pb { page-break-before: always; }
+  .foot { margin-top: 8mm; padding-top: 2.5mm; border-top: 0.4pt solid #c4d2df;
+          font-size: 8pt; color: #777; text-align: center; }
+  .tag { display: inline-block; font-size: 7.5pt; font-weight: bold; padding: 0.5mm 1.5mm;
+         border-radius: 2px; vertical-align: middle; white-space: nowrap; }
+  .p1 { background: #b03030; color: #fff; }
+  .p2 { background: #d08a1e; color: #fff; }
+  .p3 { background: #4a7fb5; color: #fff; }
+</style>
+</head>
+<body>
+
+<h1>Panduan Validasi Data</h1>
+<div class="sub"><b>Sistem 3D LiDAR Scanner</b> — Tilting 2D LiDAR (RPLIDAR C1) + IMU + Motor Stepper<br>
+Metode validasi untuk pengambilan data dari <b>posisi diam (statis)</b></div>
+
+<div class="lead">
+<b>Mengapa dokumen ini perlu.</b> Data yang <i>konsisten</i> belum tentu <i>akurat</i>. Sistem bisa
+menghasilkan hasil yang sama persis setiap kali diulang, namun tetap salah bila ada kesalahan
+kalibrasi. Karena itu validasi harus mencakup dua sisi: <b>presisi</b> (seberapa konsisten hasil
+bila diulang) dan <b>akurasi</b> (seberapa dekat hasil dengan kondisi sebenarnya di dunia nyata).
+Dokumen ini merangkum <b>7 kategori validasi</b> yang seluruhnya dapat dikerjakan tanpa
+memindahkan scanner, lengkap dengan rumus, contoh perhitungan dari data nyata, dan tabel isian.
+</div>
+
+<h2>1. Data Acuan yang Sudah Tersedia</h2>
+<p>Seluruh contoh perhitungan dalam dokumen ini dihitung dari dua rekaman berikut, bukan angka
+karangan. Keduanya diambil dari posisi diam di ruangan yang sama.</p>
+
+<table>
+<tr><th style="width:38%">Parameter</th><th class="ctr">test_om_3</th><th class="ctr">test_lab_02</th><th class="ctr">Catatan</th></tr>
+<tr><td>Durasi rekaman</td><td class="num">20,12 s</td><td class="num">60,75 s</td><td></td></tr>
+<tr><td>Sampel <code>/stepper/angle</code></td><td class="num">11.949</td><td class="num">36.574</td><td>1 sampel = 1 step</td></tr>
+<tr><td>Pesan <code>/scan</code></td><td class="num">181</td><td class="num">586</td><td>LaserScan 2D</td></tr>
+<tr><td>Pesan <code>/map_3d</code></td><td class="num">4</td><td class="num">11</td><td>1 pesan = 1 sapuan penuh</td></tr>
+<tr><td>Titik point cloud</td><td class="num">99.502</td><td class="num">271.544</td><td>hasil <code>mcaptopc.py</code></td></tr>
+<tr><td>Rentang X</td><td class="num">8,82 m</td><td class="num">8,82 m</td><td>identik</td></tr>
+<tr><td>Rentang Y</td><td class="num">17,91 m</td><td class="num">18,15 m</td><td>mirip</td></tr>
+<tr><td>Rentang Z</td><td class="num">9,03 m</td><td class="num">9,13 m</td><td>mencurigakan</td></tr>
+</table>
+
+<div class="box find">
+<span class="t">Temuan awal — presisi sudah terbukti baik</span>
+Rentang X kedua rekaman <b>identik (8,82 m)</b>, sedangkan Y dan Z hanya berbeda &lt;1,5 %,
+padahal durasi rekaman berbeda 3×. Ini menunjukkan sistem <b>sangat repeatable</b>.
+Namun justru karena itu, bila ada kesalahan, kesalahannya bersifat <b>sistematis</b> —
+bukan gangguan acak. Inilah yang perlu dibuktikan lewat validasi ground truth (Bagian&nbsp;3).
+</div>
+
+<h2>2. Kerangka Validasi — Tujuh Kategori</h2>
+<table>
+<tr><th style="width:9%" class="ctr">Kat</th><th style="width:26%">Nama</th><th>Menjawab pertanyaan</th><th style="width:15%" class="ctr">Prioritas</th></tr>
+<tr><td class="ctr"><b>A</b></td><td>Ground Truth</td><td>Apakah ukuran hasil scan sesuai ukuran nyata?</td><td class="ctr"><span class="tag p1">TINGGI</span></td></tr>
+<tr><td class="ctr"><b>B</b></td><td>Akurasi Geometris</td><td>Apakah bidang datar tetap datar dan sudut tetap siku?</td><td class="ctr"><span class="tag p1">TINGGI</span></td></tr>
+<tr><td class="ctr"><b>C</b></td><td>Presisi &amp; Repeatability</td><td>Apakah hasil konsisten bila diulang?</td><td class="ctr"><span class="tag p2">SEDANG</span></td></tr>
+<tr><td class="ctr"><b>D</b></td><td>Studi Parameter</td><td>Bagaimana pengaruh kecepatan tilt dan durasi?</td><td class="ctr"><span class="tag p2">SEDANG</span></td></tr>
+<tr><td class="ctr"><b>E</b></td><td>Error Sistematis</td><td>Apakah kalibrasi sudut dan sinkronisasi waktu benar?</td><td class="ctr"><span class="tag p1">TINGGI</span></td></tr>
+<tr><td class="ctr"><b>F</b></td><td>Perbandingan Algoritma</td><td>Varian node/SLAM mana yang terbaik?</td><td class="ctr"><span class="tag p3">RENDAH</span></td></tr>
+<tr><td class="ctr"><b>G</b></td><td>Material &amp; Lingkungan</td><td>Bagaimana pengaruh jenis permukaan?</td><td class="ctr"><span class="tag p3">RENDAH</span></td></tr>
+</table>
+
+<h2>3. Kategori A — Validasi Ground Truth</h2>
+<p><b>Tujuan.</b> Membuktikan apakah dimensi hasil pemindaian sesuai dengan dimensi
+sebenarnya. Ini satu-satunya cara mengklaim sistem <i>akurat</i>, dan merupakan validasi
+yang <b>paling mendesak</b> untuk dikerjakan.</p>
+
+<h4>Alat yang dibutuhkan</h4>
+<ul>
+<li>Meteran gulung (≥ 10 m) atau <i>laser distance meter</i> (lebih akurat, ±2 mm)</li>
+<li>Objek berdimensi diketahui: kardus, papan kalibrasi, atau tiang lurus</li>
+</ul>
+
+<h4>Prosedur</h4>
+<ol>
+<li>Ukur secara manual: <b>panjang, lebar, dan tinggi ruangan</b>; catat sebagai nilai acuan.</li>
+<li>Ukur jarak dari scanner ke tiap dinding.</li>
+<li>Lakukan pemindaian dari posisi yang sama.</li>
+<li>Buka hasil <code>.ply</code> di CloudCompare, gunakan <b>Tools → Point picking</b> untuk
+mengukur jarak antar dua titik pada dinding berseberangan.</li>
+<li>Hitung error dengan rumus di bawah.</li>
+</ol>
+
+<div class="formula">
+<div class="eq">e = | L<sub>ukur</sub> − L<sub>asli</sub> |</div>
+<div class="eq">ε = ( e ⁄ L<sub>asli</sub> ) × 100 %</div>
+<div class="ket">
+<b>e</b> = error absolut (meter) &nbsp;·&nbsp; <b>ε</b> = error relatif (persen)<br>
+<b>L<sub>ukur</sub></b> = dimensi hasil point cloud &nbsp;·&nbsp; <b>L<sub>asli</sub></b> = dimensi hasil pengukuran manual
+</div>
+</div>
+
+<h4>Tabel isian</h4>
+<table>
+<tr><th>Dimensi</th><th class="ctr">Ukur manual (m)</th><th class="ctr">Hasil scan (m)</th><th class="ctr">Error e (m)</th><th class="ctr">Error ε (%)</th></tr>
+<tr><td>Panjang ruangan</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Lebar ruangan</td><td></td><td></td><td></td><td></td></tr>
+<tr><td><b>Tinggi ruangan</b></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Jarak ke dinding depan</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Lebar kusen pintu</td><td></td><td></td><td></td><td></td></tr>
+</table>
+
+<div class="box warn">
+<span class="t">Hipotesis yang perlu diuji lebih dulu</span>
+Data yang ada menunjukkan <b>rentang Z = 9,03 m</b>. Untuk ruangan indoor dengan tinggi wajar
+2,5–3 m, angka ini <b>3× lebih besar</b> dari yang seharusnya. Bila pengukuran manual
+mengonfirmasi tinggi ruangan hanya ±3 m, maka terbukti ada <b>kesalahan skala vertikal</b> —
+dan ini menjadi temuan utama yang layak dibahas mendalam dalam laporan.
+Dua tersangka utamanya dibahas di Kategori&nbsp;E.
+</div>
+
+<h2>4. Kategori B — Akurasi Geometris</h2>
+<p>Kelebihan kategori ini: <b>seluruhnya dapat dihitung dari data yang sudah ada</b>,
+tanpa perlu pengambilan data baru.</p>
+
+<h3>B1. Uji Planaritas Dinding</h3>
+<p>Dinding yang rata di dunia nyata harus menjadi bidang yang rata pula di point cloud.
+Sebaran titik terhadap bidang ideal adalah ukuran <b>presisi (noise)</b> sistem.</p>
+
+<h4>Cara</h4>
+<ol>
+<li>Di CloudCompare, <i>segment</i> (potong) sekumpulan titik yang hanya berisi satu dinding datar.</li>
+<li>Jalankan <b>Tools → Fit → Plane</b>. CloudCompare langsung menampilkan nilai RMS.</li>
+<li>Atau hitung manual dengan rumus berikut.</li>
+</ol>
+
+<div class="formula">
+<div class="eq">d<sub>i</sub> = | n⃗ · ( p⃗<sub>i</sub> − p̄ ) |</div>
+<div class="eq">RMSE = √( (1/N) Σ d<sub>i</sub>² )</div>
+<div class="ket">
+<b>n⃗</b> = vektor normal bidang, diperoleh dari <i>eigenvector</i> dengan <i>eigenvalue</i> terkecil
+pada matriks kovarians titik (metode PCA/SVD)<br>
+<b>p̄</b> = titik rata-rata (centroid) &nbsp;·&nbsp; <b>d<sub>i</sub></b> = jarak tegak lurus titik ke bidang
+&nbsp;·&nbsp; <b>N</b> = jumlah titik
+</div>
+</div>
+
+<table>
+<tr><th style="width:22%">Nilai RMSE</th><th>Interpretasi</th></tr>
+<tr><td>&lt; 1 cm</td><td>Sangat baik — mendekati spesifikasi sensor</td></tr>
+<tr><td>1 – 3 cm</td><td>Wajar untuk LiDAR kelas RPLIDAR</td></tr>
+<tr><td>3 – 10 cm</td><td>Ada noise berlebih atau distorsi gerak (lihat D2)</td></tr>
+<tr><td>&gt; 10 cm</td><td>Indikasi kuat kesalahan kalibrasi sudut atau sinkronisasi waktu</td></tr>
+</table>
+
+<h3>B2. Uji Ortogonalitas Sudut Ruangan</h3>
+<p>Dua dinding bersebelahan pada ruangan persegi seharusnya membentuk sudut <b>90°</b>.
+Penyimpangan dari 90° adalah bukti langsung adanya kesalahan geometris — dan uji ini
+<b>tidak memerlukan pengukuran manual sama sekali</b>, karena 90° sudah merupakan acuan.</p>
+
+<div class="formula">
+<div class="eq">θ = arccos ( | n⃗<sub>1</sub> · n⃗<sub>2</sub> | )</div>
+<div class="eq">Δθ = | θ − 90° |</div>
+<div class="ket">
+<b>n⃗<sub>1</sub>, n⃗<sub>2</sub></b> = vektor normal dari dua bidang dinding hasil <i>fitting</i><br>
+<b>Δθ</b> = penyimpangan dari siku-siku. Nilai &gt; 2° menandakan masalah geometris nyata.
+</div>
+</div>
+
+<h3>B3. Akurasi Jarak terhadap Range</h3>
+<p>Akurasi LiDAR menurun seiring bertambahnya jarak. Uji ini memetakan karakteristik tersebut.</p>
+<table>
+<tr><th style="width:26%">Jarak target (m)</th><th class="ctr">1,0</th><th class="ctr">3,0</th><th class="ctr">5,0</th><th class="ctr">10,0</th><th class="ctr">15,0</th></tr>
+<tr><td>Jarak terukur (m)</td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Error absolut (m)</td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Error relatif (%)</td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Jumlah titik pada target</td><td></td><td></td><td></td><td></td><td></td></tr>
+</table>
+
+<h2>5. Kategori C — Presisi &amp; Repeatability</h2>
+
+<h3>C1. Repeatability Antar-Rekaman</h3>
+<p>Lakukan pemindaian scene yang sama sebanyak <b>N ≥ 3 kali</b> tanpa mengubah apa pun,
+lalu bandingkan hasilnya. Di CloudCompare gunakan <b>Tools → Distances → Cloud/Cloud Dist</b>
+untuk mendapatkan jarak rata-rata antar dua point cloud.</p>
+
+<div class="formula">
+<div class="eq">σ = √( (1/(N−1)) Σ ( x<sub>i</sub> − x̄ )² )</div>
+<div class="ket">
+<b>σ</b> = simpangan baku suatu besaran (mis. panjang dinding terukur) dari N kali pengulangan.
+Nilai σ yang kecil = presisi tinggi. Perlu dicatat: <b>σ kecil tidak menjamin akurat</b> —
+akurasi hanya dapat dibuktikan lewat Kategori A.
+</div>
+</div>
+
+<div class="box find">
+<span class="t">Contoh nyata dari data yang sudah ada</span>
+Rentang X pada <code>test_om_3</code> dan <code>test_lab_02</code> keduanya <b>8,82 m</b>
+(selisih 0 %), rentang Z <b>9,03</b> vs <b>9,13 m</b> (selisih 1,1 %). Persentase titik outlier
+juga hampir sama: 0,16 % vs 0,15 %. <b>Kesimpulan: presisi sistem sangat baik.</b>
+Data ini sudah dapat langsung dipakai sebagai hasil uji repeatability awal di laporan.
+</div>
+
+<h3>C2. Konsistensi Antar-Sapuan</h3>
+<p>Dalam satu rekaman terdapat beberapa sapuan penuh (<code>/map_3d</code>). Bila sistem
+bekerja benar, sapuan ke-1, ke-2, dan ke-3 harus saling bertumpuk rapat. Pergeseran antar
+sapuan menandakan masalah <b>sinkronisasi waktu</b> atau <b>akumulasi error sudut</b>.</p>
+<table>
+<tr><th>Pasangan sapuan</th><th class="ctr">Jarak C2C rata-rata (cm)</th><th class="ctr">Simpangan baku (cm)</th><th>Interpretasi</th></tr>
+<tr><td>Sapuan 1 vs 2</td><td></td><td></td><td></td></tr>
+<tr><td>Sapuan 1 vs 3</td><td></td><td></td><td></td></tr>
+<tr><td>Sapuan 1 vs 4</td><td></td><td></td><td></td></tr>
+</table>
+<p style="font-size:9pt;color:#555">Bila jarak antar sapuan <b>membesar secara progresif</b>
+(1↔2 &lt; 1↔3 &lt; 1↔4), itu bukti adanya <b>drift kumulatif</b> pada perhitungan sudut stepper.</p>
+
+<h2>6. Kategori D — Studi Parameter</h2>
+
+<h3>D1. Kecepatan Tilt vs Kerapatan Titik</h3>
+<p>Parameter <code>/stepper/speed</code> berisi <b>delay per step dalam detik</b> —
+nilai lebih kecil berarti putaran lebih cepat.</p>
+
+<div class="formula">
+<div class="eq">N<sub>step/putaran</sub> = steps_per_rev ⁄ rasio_gear = 1600 ⁄ 0,5 = 3200</div>
+<div class="eq">T<sub>putaran</sub> = N<sub>step/putaran</sub> × Δt<sub>step</sub></div>
+<div class="eq">ω<sub>tilt</sub> = 360° ⁄ T<sub>putaran</sub></div>
+<div class="ket">
+<b>rasio_gear</b> = 30T ⁄ 60T = 0,5 (LiDAR berputar setengah kecepatan motor)<br>
+<b>Δt<sub>step</sub></b> = delay per step &nbsp;·&nbsp; <b>ω<sub>tilt</sub></b> = kecepatan sudut tilt (derajat/detik)
+</div>
+</div>
+
+<table>
+<tr><th>Uji</th><th class="ctr">delay (s)</th><th class="ctr">ω tilt (°/s)</th><th class="ctr">Durasi 1 sapuan (s)</th><th class="ctr">Titik per sapuan</th><th class="ctr">Jarak antar garis @5 m (m)</th></tr>
+<tr><td>Sangat lambat</td><td class="ctr">0,05</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Lambat</td><td class="ctr">0,01</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Normal</td><td class="ctr">0,005</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Cepat</td><td class="ctr">0,002</td><td></td><td></td><td></td><td></td></tr>
+</table>
+
+<h3>D2. Distorsi Gerak (Motion Distortion) — sering terlewat</h3>
+<p>Satu pemindaian LiDAR 2D memerlukan waktu tertentu untuk selesai. Selama waktu itu,
+motor <b>terus memiringkan sensor</b>, sehingga satu garis scan tidak terekam pada satu sudut
+tunggal melainkan <b>tersebar (ter-<i>smear</i>)</b> sepanjang rentang sudut. Inilah
+trade-off inti sistem tilting: makin cepat tilt, makin padat cakupan per waktu,
+tetapi makin besar pula distorsinya.</p>
+
+<div class="formula">
+<div class="eq">Δφ = ω<sub>tilt</sub> ⁄ f<sub>scan</sub></div>
+<div class="eq">g = r × tan( Δφ )</div>
+<div class="ket">
+<b>Δφ</b> = besar sudut tilt yang tersapu selama <i>satu</i> pemindaian (derajat) —
+sekaligus jarak sudut antar garis scan<br>
+<b>f<sub>scan</sub></b> = frekuensi scan LiDAR (Hz) &nbsp;·&nbsp;
+<b>g</b> = celah antar garis scan pada jarak <b>r</b> dari sensor
+</div>
+</div>
+
+<div class="box find">
+<span class="t">Contoh perhitungan nyata — data test_om_3</span>
+Diketahui dari rekaman: ω<sub>tilt</sub> = <b>71,6 °/s</b>, f<sub>scan</sub> = <b>9,00 Hz</b>.
+<div style="margin:2mm 0 1.5mm 3mm">
+Δφ = 71,6 ⁄ 9,00 = <b>7,96°</b> &nbsp;→&nbsp; setiap garis scan ter-<i>smear</i> sejauh hampir 8 derajat<br>
+g = 5 × tan(7,96°) = <b>0,70 meter</b> &nbsp;→&nbsp; pada dinding berjarak 5 m, celah antar garis mencapai 70 cm
+</div>
+Inilah penjelasan kuantitatif mengapa point cloud terlihat <b>bergaris-garis renggang</b>.
+Untuk memperapat, perlambat tilt (perbesar delay) atau perbanyak durasi perekaman.
+</div>
+
+<h3>D3. Frekuensi Scan LiDAR</h3>
+<p>Parameter <code>scan_frequency</code> pada <code>sllidar_c1_launch.py</code> saat ini
+diatur <b>12 Hz</b>, namun pengukuran dari data menunjukkan nilai aktual hanya
+<b>9,00 Hz</b> (test_om_3) dan <b>9,65 Hz</b> (test_lab_02).</p>
+
+<div class="box warn">
+<span class="t">Temuan — frekuensi scan tidak sesuai konfigurasi</span>
+Terdapat selisih <b>20–25 %</b> antara frekuensi yang dikonfigurasi (12 Hz) dan yang benar-benar
+tercapai (9,0–9,7 Hz). Penyebab yang perlu diselidiki: keterbatasan mode
+<code>DenseBoost</code>, beban CPU Raspberry Pi, atau <b>kestabilan catu daya</b>
+(sistem ini pernah mengalami <i>USB overcurrent</i>). Selisih ini <b>wajib dilaporkan</b>,
+karena seluruh perhitungan kerapatan bergantung padanya.
+</div>
+
+<h3>D4. Durasi Perekaman vs Kelengkapan</h3>
+<table>
+<tr><th>Durasi (detik)</th><th class="ctr">Jumlah sapuan</th><th class="ctr">Total titik</th><th class="ctr">Kerapatan (titik/m²)</th><th class="ctr">Celah tersisa</th></tr>
+<tr><td>20 <span style="color:#777">(test_om_3)</span></td><td class="ctr">4</td><td class="ctr">99.502</td><td></td><td></td></tr>
+<tr><td>60 <span style="color:#777">(test_lab_02)</span></td><td class="ctr">11</td><td class="ctr">271.544</td><td></td><td></td></tr>
+<tr><td>120</td><td class="ctr"></td><td class="ctr"></td><td></td><td></td></tr>
+<tr><td>300</td><td class="ctr"></td><td class="ctr"></td><td></td><td></td></tr>
+</table>
+<div class="formula">
+<div class="eq">ρ = N<sub>titik</sub> ⁄ A</div>
+<div class="ket"><b>ρ</b> = kerapatan titik (titik/m²) &nbsp;·&nbsp; <b>A</b> = luas permukaan yang tercakup (m²)</div>
+</div>
+
+<h2>7. Kategori E — Karakterisasi Error Sistematis</h2>
+<p>Kategori ini paling relevan dengan anomali rentang Z yang ditemukan, dan berpotensi
+menjadi <b>kontribusi utama</b> laporan.</p>
+
+<h3>E1. Validasi Kalibrasi Sudut</h3>
+<p>Perlu dipastikan berapa <b>step motor yang benar-benar dibutuhkan</b> untuk satu putaran
+penuh LiDAR (360°). Terdapat dua nilai yang saling bertentangan di dalam kode: rumus
+perhitungan menghasilkan <b>3200</b>, sedangkan komentar pada berkas
+<code>stepper_node.py</code> menyebut angka <b>400</b>.</p>
+
+<h4>Metode 1 — analisis data (sudah dilakukan)</h4>
+<p>Menghitung jumlah sampel <code>/stepper/angle</code> di antara dua kali <i>wrap</i>
+sudut (saat sudut kembali dari ±2π ke 0).</p>
+
+<table>
+<tr><th>Sumber</th><th class="ctr">Step per putaran LiDAR</th><th class="ctr">Selisih thd. teori (3200)</th></tr>
+<tr><td>Teori — rumus <code>1600 ⁄ 0,5</code></td><td class="ctr"><b>3200</b></td><td class="ctr">acuan</td></tr>
+<tr><td>Data <code>test_om_3</code> (4 putaran)</td><td class="ctr"><b>2987</b></td><td class="ctr">−6,7 %</td></tr>
+<tr><td>Data <code>test_lab_02</code> (11 putaran)</td><td class="ctr"><b>3325</b></td><td class="ctr">+3,9 %</td></tr>
+<tr><td>Komentar di dalam kode</td><td class="ctr"><b>400</b></td><td class="ctr">−87,5 %</td></tr>
+</table>
+
+<div class="box find">
+<span class="t">Hasil — komentar pada kode terbukti keliru</span>
+Kedua rekaman menghasilkan <b>2987</b> dan <b>3325</b> step per putaran (rata-rata ≈ 3156),
+yaitu <b>sangat dekat dengan nilai teoretis 3200</b> dan sama sekali jauh dari angka 400.
+<b>Kesimpulan: rumus di dalam kode sudah benar; yang salah adalah komentarnya.</b>
+Dengan demikian anomali rentang Z <i>bukan</i> disebabkan oleh kesalahan jumlah step —
+sehingga tersangka utama beralih ke <b>E2 (transform ganda)</b>.
+</div>
+
+<h4>Metode 2 — verifikasi fisik (disarankan sebagai pembanding)</h4>
+<ol>
+<li>Beri tanda (spidol/stiker) pada badan LiDAR dan pada dudukan sebagai titik acuan.</li>
+<li>Matikan node, jalankan skrip <code>stepper_test.py</code>.</li>
+<li>Perintahkan sejumlah step tertentu (mis. 3200), amati apakah tanda kembali tepat ke posisi awal.</li>
+<li>Ulangi 3× dan catat penyimpangan sudutnya dengan busur derajat.</li>
+</ol>
+
+<h3>E2. Validasi Sinkronisasi Waktu &amp; Transform</h3>
+<p>Node <code>mapping_3d</code> menentukan sudut tiap berkas laser dengan cara
+<b>interpolasi terhadap waktu</b>. Bila terdapat selisih waktu (latency) antara timestamp
+<code>/scan</code> dan <code>/stepper/angle</code>, seluruh titik akan tergeser sudutnya —
+menghasilkan distorsi berbentuk <b>miring atau memilin</b>.</p>
+
+<h4>Uji tepi vertikal — sederhana namun sangat informatif</h4>
+<ol>
+<li>Pilih objek dengan <b>tepi vertikal lurus</b>: kusen pintu, tiang, atau sudut lemari.</li>
+<li>Lakukan pemindaian seperti biasa.</li>
+<li>Amati tepi tersebut pada point cloud dari <b>tampak samping</b>.</li>
+</ol>
+<table>
+<tr><th style="width:38%">Bentuk tepi pada hasil scan</th><th>Diagnosis</th></tr>
+<tr><td>Lurus tegak</td><td>Sinkronisasi waktu sudah benar</td></tr>
+<tr><td>Miring konsisten satu arah</td><td>Ada <i>offset</i> waktu tetap antara scan dan sudut</td></tr>
+<tr><td>Memilin / spiral</td><td>Kesalahan skala sudut (faktor pengali sudut tidak tepat)</td></tr>
+<tr><td>Terbelah / ganda</td><td>Indikasi <b>transform ganda</b> — lihat catatan di bawah</td></tr>
+</table>
+
+<div class="box warn">
+<span class="t">Tersangka utama anomali Z — dugaan transform ganda</span>
+Pada <code>mapping_3d.py</code>, titik <b>sudah diputar</b> sebesar <code>−servo_angle</code>
+melalui <code>Rotation.from_euler('x', −servo_angle)</code>, lalu diberi
+<code>frame_id = "lidar_tilt"</code>. Padahal <code>stepper_node.py</code> <b>juga</b>
+memancarkan TF <code>base_link → lidar_tilt</code> sebesar <code>+servo_angle</code>.<br><br>
+Akibatnya, konsumen data yang menggunakan TF berpotensi <b>memutar titik dua kali</b>,
+yang dapat menjelaskan mengapa rentang Z membesar hingga ±4,5 m.
+<b>Cara pengujian:</b> bandingkan hasil dengan Fixed Frame <code>lidar_tilt</code>
+versus <code>base_link</code> di RViz — bila bentuknya berbeda jauh, dugaan ini terkonfirmasi.
+</div>
+
+<h3>E3. Uji Arah Rotasi</h3>
+<p>Pindai objek yang jelas asimetris (misalnya huruf besar pada kertas atau benda yang
+hanya ada di satu sisi ruangan), lalu periksa apakah hasilnya <b>ter-cermin</b>.
+Kesalahan tanda (+/−) pada rotasi akan menghasilkan point cloud yang terbalik.</p>
+
+<h2>8. Kategori F — Perbandingan Algoritma</h2>
+<p>Karena data direkam dalam bentuk <i>bag</i>, satu berkas rekaman yang sama dapat diputar
+ulang ke beberapa algoritma yang berbeda. Ini menghasilkan perbandingan yang <b>adil secara
+metodologis</b>, karena variabel masukan benar-benar identik.</p>
+
+<table>
+<tr><th>Yang dibandingkan</th><th>Varian</th><th>Metrik penilaian</th></tr>
+<tr><td rowspan="3">Node mapping</td><td><code>mapping_3d</code> (full-sweep)</td><td rowspan="3">RMSE planaritas, jumlah titik, ortogonalitas, waktu proses</td></tr>
+<tr><td><code>mapping_3d_fastlio</code> (full-sweep)</td></tr>
+<tr><td><code>mapping_3d_fastlio_scan</code> (per-scan)</td></tr>
+<tr><td rowspan="2">Algoritma SLAM</td><td>FAST-LIO2 (spark-fast-lio)</td><td rowspan="2">Kualitas peta, konsumsi CPU/RAM, kestabilan</td></tr>
+<tr><td>RTAB-Map (icp_odometry)</td></tr>
+</table>
+<p style="font-size:9pt;color:#555">Cara memutar ulang rekaman:
+<code>ros2 bag play ~/bags/nama_rekaman</code> — lalu jalankan node yang ingin diuji.</p>
+
+<h2>9. Kategori G — Faktor Material &amp; Lingkungan</h2>
+<p>Sistem sudah merekam field <b><code>intensity</code></b> pada setiap titik, namun
+sejauh ini belum dimanfaatkan. Ini merupakan dimensi analisis tambahan yang tersedia
+secara gratis dari data yang sudah ada.</p>
+
+<table>
+<tr><th>Jenis permukaan</th><th class="ctr">Jumlah titik terdeteksi</th><th class="ctr">Intensity rata-rata</th><th class="ctr">Error jarak (m)</th><th>Catatan</th></tr>
+<tr><td>Tembok cat putih</td><td></td><td></td><td></td><td>acuan</td></tr>
+<tr><td>Permukaan gelap / hitam</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Kaca jendela</td><td></td><td></td><td></td><td>rawan tembus</td></tr>
+<tr><td>Cermin</td><td></td><td></td><td></td><td>rawan pantulan palsu</td></tr>
+<tr><td>Logam mengkilap</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Kain / tirai</td><td></td><td></td><td></td><td></td></tr>
+</table>
+
+<p><b>Uji sudut datang (grazing angle).</b> Permukaan yang hampir sejajar dengan arah berkas
+laser memantulkan sinyal dengan buruk. Ujilah pada sudut datang 90°, 60°, 30°, dan 15°,
+lalu catat jumlah titik yang berhasil terdeteksi pada tiap sudut.</p>
+
+<h2>10. Batasan — Yang Tidak Dapat Divalidasi dari Posisi Diam</h2>
+<p>Bagian ini penting untuk mencegah klaim berlebihan di dalam laporan.</p>
+<table>
+<tr><th style="width:34%">Aspek</th><th>Alasan tidak bisa diuji secara statis</th></tr>
+<tr><td>Drift odometri</td><td>Drift baru muncul saat sensor berpindah posisi</td></tr>
+<tr><td>Loop closure</td><td>Memerlukan lintasan yang kembali ke titik yang pernah dilewati</td></tr>
+<tr><td>Akurasi SLAM saat bergerak</td><td>Memerlukan data pergerakan beserta acuan lintasan sebenarnya</td></tr>
+<tr><td>Registrasi antar-posisi</td><td>Memerlukan pemindaian dari beberapa titik berdiri yang berbeda</td></tr>
+<tr><td>Objek bergerak</td><td>Memerlukan skenario dengan objek dinamis</td></tr>
+</table>
+<p style="font-size:9.5pt">Bila aspek-aspek di atas ingin dimasukkan ke dalam penelitian,
+diperlukan tahap pengambilan data lanjutan dengan scanner yang dipindahkan
+(misalnya dipasang pada troli atau dibawa berjalan).</p>
+
+<h2>11. Prioritas dan Urutan Pengerjaan</h2>
+<table>
+<tr><th class="ctr" style="width:8%">Urutan</th><th style="width:34%">Kegiatan</th><th class="ctr" style="width:16%">Perlu data baru?</th><th>Keluaran</th></tr>
+<tr><td class="ctr"><b>1</b></td><td>Ground truth dimensi ruangan (A)</td><td class="ctr">Ya — ukur manual</td><td>Membuktikan / menyanggah anomali Z</td></tr>
+<tr><td class="ctr"><b>2</b></td><td>Planaritas &amp; ortogonalitas (B1, B2)</td><td class="ctr"><b>Tidak</b></td><td>Angka RMSE dan Δθ untuk laporan</td></tr>
+<tr><td class="ctr"><b>3</b></td><td>Uji transform ganda (E2)</td><td class="ctr">Tidak</td><td>Menemukan akar penyebab anomali Z</td></tr>
+<tr><td class="ctr"><b>4</b></td><td>Uji tepi vertikal (E2)</td><td class="ctr">Ya — 1 scan</td><td>Diagnosis sinkronisasi waktu</td></tr>
+<tr><td class="ctr"><b>5</b></td><td>Studi kecepatan tilt (D1, D2)</td><td class="ctr">Ya — 4 scan</td><td>Kurva trade-off kerapatan vs distorsi</td></tr>
+<tr><td class="ctr"><b>6</b></td><td>Repeatability 3× (C1)</td><td class="ctr">Ya — 3 scan</td><td>Nilai simpangan baku σ</td></tr>
+<tr><td class="ctr"><b>7</b></td><td>Perbandingan algoritma (F)</td><td class="ctr">Tidak</td><td>Tabel perbandingan metode</td></tr>
+<tr><td class="ctr"><b>8</b></td><td>Uji material (G)</td><td class="ctr">Ya</td><td>Karakterisasi keterbatasan sensor</td></tr>
+</table>
+
+<div class="box">
+<span class="t">Catatan penting sebelum mengambil data baru</span>
+Sistem pernah mengalami <b>USB overcurrent</b>, yang menyebabkan LiDAR terputus dan
+tersambung ulang dengan nomor port berubah-ubah. Kondisi ini juga diduga menjadi penyebab
+frekuensi scan hanya tercapai 9 Hz dari 12 Hz yang dikonfigurasi. <b>Sebelum melakukan
+pengambilan data untuk validasi, pastikan catu daya sudah stabil</b> (gunakan PSU
+Raspberry Pi 5 berdaya 27 W dan/atau USB hub bercatu daya sendiri), agar data yang
+dikumpulkan benar-benar sahih dan tidak terputus di tengah perekaman.
+</div>
+
+<h2>12. Lampiran — Template Pencatatan Setiap Pengambilan Data</h2>
+<table>
+<tr><th style="width:30%">Item</th><th>Isian</th></tr>
+<tr><td>Kode / nama rekaman</td><td></td></tr>
+<tr><td>Tanggal &amp; jam</td><td></td></tr>
+<tr><td>Lokasi &amp; dimensi ruangan</td><td></td></tr>
+<tr><td>Posisi &amp; tinggi scanner</td><td></td></tr>
+<tr><td>Delay stepper (s)</td><td></td></tr>
+<tr><td>scan_frequency LiDAR (Hz)</td><td></td></tr>
+<tr><td>Durasi perekaman (s)</td><td></td></tr>
+<tr><td>Node mapping yang dipakai</td><td></td></tr>
+<tr><td>Catu daya yang digunakan</td><td></td></tr>
+<tr><td>Kondisi khusus / kendala</td><td></td></tr>
+<tr><td>Jumlah sapuan &amp; total titik</td><td></td></tr>
+</table>
+
+<div class="foot">
+Panduan Validasi Data — Sistem 3D LiDAR Scanner &nbsp;·&nbsp;
+Seluruh contoh perhitungan dihitung dari rekaman <code>test_om_3</code> dan <code>test_lab_02</code>
+</div>
+
+</body>
+</html>

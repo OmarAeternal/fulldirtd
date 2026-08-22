@@ -1,0 +1,310 @@
+CARA PAKAI — cloudcom
+=====================
+
+DI MANA FILE-FILENYA
+    data & hasil : ~/riset td/cloudcom/        <- .mcap dan folder out/
+    program      : ~/riset td/ros2_ws/cloudcom/
+
+Perintahnya boleh dijalankan dari mana saja. Paling enak dari folder data,
+supaya nama .mcap bisa diketik apa adanya:
+    cd "~/riset td/cloudcom"
+
+Hasil selalu masuk ke ~/riset td/cloudcom/out/, di mana pun kamu berada.
+Mau pindah? Set env var, tanpa mengubah kode:
+    export CLOUDCOM_OUT="~/tempat/lain"
+
+clomcap, clomcaps, clomerge, clomergeout, outmerge, dan clocom sudah jadi
+perintah, jalan dari mana saja. Untuk skrip yang belum (bagian 7 dan 8 di
+bawah), ketik sekali per terminal:
+    CC="$HOME/riset td/ros2_ws/cloudcom"
+
+
+1. clomcap  —  mcap → CloudCompare + grid, satu perintah
+--------------------------------------------------------
+    clomcap scan_0007_1sweep_0.mcap
+
+CloudCompare langsung terbuka berisi grid + point cloud dari topik /map_3d.
+Hasil disimpan di out/<nama>/ berisi <nama>.ply dan grid.ply.
+Terima juga .mcap.zstd, .ply, dan .xyz.
+
+Kalau sudah pernah dijalankan, run berikutnya pakai hasil lama (instan).
+
+Pilihan tambahan:
+    --force            konversi ulang, jangan pakai hasil lama
+    --png              buat juga PNG visualisasi
+    --no-grid          buka point cloud saja, tanpa grid
+    -t /map_3d         paksa topik tertentu
+    --spacing 0.5      jarak garis grid (meter, default 1.0)
+    --margin 2         margin grid di luar data (meter, default 1.0)
+
+Contoh:
+    clomcap scan_0007_1sweep_0.mcap --force --png
+    clomcap scan_0008_1sweep_0.mcap --spacing 0.5
+
+
+2. clomcaps  —  banyak file sekaligus dalam SATU CloudCompare
+--------------------------------------------------------------
+Sama seperti clomcap, tapi menerima beberapa file dan membuka semuanya dalam
+satu jendela. Berguna untuk membandingkan atau meregistrasi antar scan.
+
+    clomcaps scan_0003_1sweep_0.mcap scan_0004_1sweep_0.mcap \
+             scan_0005_1sweep_0.mcap scan_0006_1sweep_0.mcap
+
+    clomcaps *.mcap
+
+Bedanya dengan clomcap:
+  - Grid dibuat SATU saja, ukurannya menutupi gabungan semua data, disimpan
+    di out/_multi/grid.ply. (Kalau diberi satu file saja, grid tetap masuk ke
+    out/<nama>/grid.ply seperti clomcap.)
+  - PLY tiap scan tetap di out/<nama>/<nama>.ply, jadi cache dipakai bersama
+    dengan clomcap — scan yang sudah pernah dikonversi langsung terbuka.
+  - File yang gagal dikonversi dilewati dan dilaporkan di akhir; sisanya tetap
+    dibuka. Berhenti dengan error hanya kalau semua file gagal.
+  - Masukan yang menunjuk file sama dibuang otomatis.
+
+Semua pilihan clomcap berlaku dan dikenakan ke semua file:
+    --force  --png  --no-grid  -t /map_3d  --spacing 0.5  --margin 2
+
+
+3. clomerge  —  satukan scan dari beberapa posisi jadi satu cloud
+------------------------------------------------------------------
+Tiap scan punya origin sendiri (titik 0,0,0 = posisi sensor saat merekam),
+jadi kalau cuma dibuka bareng lewat clomcaps, keempatnya menumpuk di tempat
+yang sama. clomerge mencari sendiri geseran+putaran tiap scan ke scan acuan:
+
+    kasar : FPFH feature + RANSAC (tanpa perlu tebakan awal)
+    halus : ICP point-to-plane bertingkat, kasar ke halus
+
+    clomerge scan_0003_1sweep_0.mcap scan_0004_1sweep_0.mcap \
+             scan_0005_1sweep_0.mcap scan_0006_1sweep_0.mcap
+
+File PERTAMA jadi acuan; sisanya digeser ke dia — bukan berantai, supaya
+error tidak menumpuk dari satu scan ke scan berikutnya.
+
+Setelah tergabung, LANTAI DIRATAKAN otomatis: bidang lantai dicari, lalu
+seluruh cloud diputar supaya lantai mendatar dan ditaruh di Z=0 — jadi lantai
+menempel persis di grid dan tinggi benda bisa langsung dibaca dari grid.
+Putarannya minimal, hanya kemiringan yang dikoreksi; arah hadap dinding
+dibiarkan apa adanya. Grid TIDAK PERNAH ikut diputar, selalu sejajar sumbu.
+
+Kalau bidang lantai tidak ketemu, muncul [WARN] dan hasilnya dibiarkan apa
+adanya — grid tetap dibuat dan CloudCompare tetap terbuka.
+
+TIAP RUN DISIMPAN SENDIRI, tidak menimpa yang sebelumnya:
+    out/_merge/001/    run pertama
+    out/_merge/002/    run kedua
+    out/_merge/003/    dan seterusnya
+
+Ini penting karena registrasi memakai RANSAC yang acak — run yang sama persis
+bisa memberi hasil berbeda, dan yang sebelumnya sering masih layak dibandingkan.
+Nomor selalu naik, jadi yang terbesar adalah yang terbaru. Folder lama boleh
+dihapus manual kalau sudah tidak perlu.
+
+Isi tiap folder:
+    merged.ply         gabungan, warna viridis menurut Z (= tinggi dari lantai)
+    merged_check.ply   gabungan, tiap scan satu warna — UNTUK MEMERIKSA
+    grid.ply           grid referensi, menutupi gabungan + margin
+    transforms.txt     matriks 4x4 tiap scan + skor kualitasnya
+
+Perataan lantai sudah dipanggang ke dalam tiap matriks di transforms.txt, jadi
+menerapkan matriks itu ke scan aslinya menghasilkan merged.ply apa adanya.
+Besar kemiringan yang dikoreksi dicetak di layar dan di bagian atas file itu.
+
+Cara memeriksa hasilnya: buka merged_check.ply. Kalau satu dinding terlihat
+DOBEL dengan dua warna berbeda, registrasi scan itu meleset. Kalau warnanya
+saling menyatu di permukaan yang sama, berarti benar.
+
+Skor dinilai pada jarak tetap 0,10 m DAN hanya pada permukaan tegak (dinding).
+Lantai & plafon sengaja dibuang dari penilaian: keduanya sama saja diputar
+berapa pun terhadap sumbu Z, padahal jumlahnya jauh lebih banyak — kalau ikut
+dinilai, solusi yang melenceng 90° bisa menang.
+    BAIK    fitness >= 0.40 dan rmse <= 0.06 m
+    RAGU    fitness >= 0.20
+    GAGAL   di bawah itu
+
+Pilihan tambahan:
+    --voxel 0.25       ukuran voxel registrasi (default 0.15); perbesar kalau
+                       ruangan luas, hasilnya meleset, atau prosesnya lama
+    --tries 8          berapa kali registrasi diulang per scan lalu diambil
+                       yang terbaik (default 4). RANSAC mendarat di jawaban
+                       berbeda tiap dijalankan — termasuk kadang yang melenceng
+                       90° — jadi satu percobaan saja tidak bisa diandalkan.
+                       Perbanyak kalau masih ada yang meleset.
+    --drop-failed      buang scan yang GAGAL, jangan ikut digabung
+    --no-level         jangan ratakan lantai, biarkan miring apa adanya
+    --no-grid          jangan sertakan grid
+    --spacing 0.5      jarak garis grid (meter, default 1.0)
+    --margin 2         margin grid di luar data (meter, default 1.0)
+    --no-open          jangan buka CloudCompare setelah selesai
+    --force --png -t   sama seperti clomcap
+
+Kalau ada scan yang RAGU atau GAGAL, atau terlihat meleset 90°:
+  - coba --tries lebih banyak (8 atau 12) — ini yang paling sering menolong
+  - coba --voxel lebih besar (0.25 atau 0.3)
+  - coba scan lain sebagai acuan — taruh dia di urutan pertama
+  - overlap antar posisi mungkin memang terlalu kecil (<30%); itu tidak bisa
+    ditambal oleh parameter, perlu scan tambahan di posisi antara
+  - untuk kasus sulit, registrasi manual di CloudCompare masih lebih andal:
+    Tools > Registration > Align (point pairs picking), lalu Fine registration (ICP)
+
+
+4. clomergeout  —  versi outdoor: scan melingkar searah
+--------------------------------------------------------
+Pakai ini kalau scan diambil MENGELILINGI sesuatu searah, mis. 4 posisi tiap
+90 derajat. Di luar ruangan irisan antar scan sering tipis dan scan ke-4 bisa
+tidak melihat apa pun dari scan ke-1 — di situ clomerge biasa patah, karena ia
+memaksa semua scan cocok ke scan pertama.
+
+    clomergeout scan_0003_1sweep_0.mcap scan_0004_1sweep_0.mcap \
+                scan_0005_1sweep_0.mcap scan_0006_1sweep_0.mcap
+
+    clomergeout *.mcap --step-deg 45
+
+URUTAN PUTARAN DIAMBIL DARI INDEKS PADA NAMA BERKAS, terkecil dulu — bukan
+urutan pengetikan. scan_0003 → scan_0004 → scan_0005 → scan_0006 → kembali ke
+scan_0003. Urutan yang dipakai selalu dicetak di awal, periksa sekilas.
+
+Bedanya dengan clomerge:
+  - Hanya pasangan BERTETANGGA yang dicocokkan (1-2, 2-3, 3-4), bukan semua ke
+    scan pertama. Jadi tiap scan cukup beririsan dengan tetangganya saja.
+  - Tiap pasang diberi TEBAKAN AWAL sudut 360/jumlah_file, lalu ICP merapikan.
+    Jauh lebih kokoh daripada menebak dari nol saat cirinya sedikit.
+  - SUDUTNYA TIDAK HARUS PAS. 90 derajat cuma titik awal; beberapa sudut di
+    sekitarnya ikut dicoba (default ±25°). Kalau aslinya 104°, tetap terkunci.
+  - LINGKARAN DITUTUP (terakhir → pertama). Selisih saat menutup = total
+    hanyutan, lalu dibagi rata ke semua sambungan alih-alih menumpuk di ujung.
+    Besarnya dicetak: "Error lingkaran: 8.6 m / 85° → 0.5 m / 2.8°".
+  - Kalau tebakan sudut gagal untuk satu pasang, pasangan itu otomatis diulang
+    dengan FPFH+RANSAC seperti clomerge biasa.
+
+Hasil di out/_merge_out/001/, 002/, dst. — terpisah dari out/_merge/ milik
+clomerge, supaya tidak tercampur.
+
+Pilihan tambahan:
+    --step-deg 45      sudut per langkah (default 360/jumlah file)
+    --spread 40        seberapa lebar sudut di sekitarnya dicoba (default 25)
+    --seeds 7          berapa sudut dicicip dalam rentang itu (default 5)
+    --no-loop          jangan tutup lingkaran, rantai saja
+    --voxel  --tries  --no-level  --no-grid  --spacing  --margin  --no-open
+                       sama seperti clomerge
+
+Kalau ada sambungan yang RAGU atau GAGAL:
+  - --spread lebih lebar (40 atau 60), dan --seeds lebih banyak (7 atau 9)
+  - --step-deg yang lebih sesuai kenyataan, kalau kamu tahu perkiraannya
+  - irisan antar posisi mungkin memang terlalu kecil; itu tidak bisa ditambal
+    parameter, perlu scan tambahan di posisi antara
+
+PENTING: loop closure membuat lingkaran KONSISTEN, bukan otomatis BENAR. Kalau
+tiap sambungannya sendiri meleset, membagi rata errornya tidak memperbaiki
+kesalahan itu — hanya menyebarkannya. Selalu periksa merged_check.ply.
+
+
+5. outmerge  —  outdoor, peta yang tumbuh  (COBA INI DULU DI LUAR RUANGAN)
+---------------------------------------------------------------------------
+    outmerge scan_0011_1sweep_0.mcap scan_0012_1sweep_0.mcap \
+             scan_0013_1sweep_0.mcap scan_0014_1sweep_0.mcap
+
+Tidak peduli urutan nama, tidak perlu tahu sudutnya, tidak harus melingkar.
+Cara kerjanya:
+
+  1. Tanah tiap scan diratakan (miring dikoreksi, tanah ke z=0). Sisa yang
+     dicari tinggal putaran tegak + geseran mendatar — 3 derajat kebebasan.
+  2. Sudut disapu penuh 360° tiap 2° lewat citra tampak-atas + FFT, bukan
+     ditebak. Puncak terbaiknya jadi titik awal ICP.
+  3. Scan berikutnya dicocokkan ke PETA GABUNGAN, bukan ke satu scan. Yang
+     irisannya tipis otomatis ditunda sampai petanya cukup lebar.
+
+Contohnya pada scan 0011-0014: 0012 GAGAL dicocokkan ke 0013 (fitness 0,14)
+maupun 0014 (0,09) satu lawan satu, tapi ke peta 3 scan lain jadi 0,37 BAIK.
+
+Selain fitness dan rmse, ada MARGIN: selisih terhadap jawaban BEDA terbaik
+berikutnya. Margin ~0 berarti ada dua tafsir yang sama masuk akalnya; di atas
+0,2 berarti terkunci.
+
+Hasil di out/_outmerge/001/, 002/, dst. Isinya sama seperti clomerge. Matriks
+di transforms.txt sudah termasuk perataan tanah.
+
+Pilihan tambahan:
+    --range 8          jari-jari potong (default 6 m; 0 = jangan potong).
+                       Ini yang paling sering menolong kalau ada yang GAGAL.
+    --step-deg 1       kerapatan sapuan sudut (default 2)
+    --seeds 20         berapa puncak dilanjutkan ke ICP (default 14)
+    --rounds 3         putaran perapian di akhir (default 2; 0 = lewati)
+    -t  --force  --png  --no-grid  --spacing  --margin  --no-open
+                       sama seperti clomerge
+
+Opsi ditaruh di belakang atau di depan, sama saja, dan boleh digabung:
+    outmerge scan_00*.mcap --range 8
+    outmerge --range 8 scan_00*.mcap
+    outmerge scan_00*.mcap --range 8 --seeds 20 --no-open
+
+Nilai yang dipakai dicetak di awal ("Jangkauan : 8.0 m"), jadi bisa dicek
+sekilas. Tiap run masuk folder bernomor baru, run lama tidak tertimpa — enak
+untuk membandingkan --range 6 vs --range 8.
+
+4 scan @ ~450 ribu titik ≈ 2,5 menit.
+
+
+6. clocom  —  buka CloudCompare biasa
+--------------------------------------
+    clocom                                    buka kosong
+    clocom out/scan_0007_1sweep_0/*.ply       buka hasil satu scan
+    clocom a.ply b.ply                        buka beberapa file sekaligus
+
+Terlepas dari terminal — terminal boleh ditutup, CloudCompare tetap jalan.
+
+
+7. mcaptopc_cli.py  —  mcap → PLY + XYZ + PNG (tanpa buka CloudCompare)
+-----------------------------------------------------------------------
+Pakai ini kalau butuh file .xyz atau PNG-nya, bukan mau langsung melihat.
+
+    "$CC/.venv/bin/python" "$CC/mcaptopc_cli.py" scan_0007_1sweep_0.mcap
+
+Menghasilkan 3 file di folder yang sama dengan .mcap-nya:
+    <nama>_pointcloud.ply
+    <nama>_pointcloud.xyz
+    <nama>_scan_viz.png
+
+Pilihan tambahan:
+    -o /folder/output       taruh hasil di folder lain
+    -t /map_3d              paksa topik tertentu
+
+
+8. make_grid.py  —  buat grid sendiri
+--------------------------------------
+Biasanya tidak perlu (clomcap sudah otomatis). Kalau mau grid manual:
+
+    "$CC/.venv/bin/python" "$CC/make_grid.py" -o grid.ply --spacing 1 a.ply
+        ukuran grid menyesuaikan a.ply
+
+    "$CC/.venv/bin/python" "$CC/make_grid.py" -o grid.ply \
+        --xmin -5 --xmax 6 --ymin -12 --ymax 6
+        ukuran grid ditentukan sendiri
+
+Sumbu X merah, sumbu Y hijau, garis tebal tiap 5 m.
+
+
+Bacaan lebih lanjut
+-------------------
+docs/cara-kerja-clomerge.md   cara kerja algoritma merge, plus referensi dan
+                              kata kunci untuk belajar lebih dalam
+docs/slam-3d-drone.md         analisis kelayakan SLAM 3D dari drone
+
+
+Catatan
+-------
+- clomcap, clomcaps, clomerge, clomergeout, dan clocom didefinisikan di ~/.bash_aliases. Kalau perintahnya tidak
+  dikenali, buka terminal baru atau jalankan: source ~/.bash_aliases
+- Folder ~/riset td/cloudcom/out/ boleh dihapus kapan saja; isinya dibuat ulang
+  otomatis (hanya perlu konversi ulang, jadi run berikutnya lebih lama sekali).
+- Folder backup/ berisi salinan clomerge.py, test_clomerge.py, dan CARA_PAKAI.txt
+  sebelum perataan lantai ditambahkan. Kalau hasilnya dirasa kurang, kembalikan
+  dengan: cp backup/clomerge.py backup/test_clomerge.py backup/CARA_PAKAI.txt .
+  Untuk sekadar mematikan perataannya, cukup pakai --no-level.
+- clomerge butuh Open3D. Kalau hilang, pasang ulang dengan:
+      .venv/bin/python -m pip install open3d
+  (pakai `python -m pip`, bukan `.venv/bin/pip` — pip-nya rusak karena
+  venv ini pernah dipindah dari ros2_ws/src/cloudcom/)
+- Menjalankan tes:
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest -v
+  Env var itu perlu karena ROS Jazzy ada di PYTHONPATH dan mengganggu pytest.

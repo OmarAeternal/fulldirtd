@@ -1,0 +1,1 @@
+SUBSYSTEM=="tty", ATTRS{serial}=="6aa92f87fbe5ed11b5f6d3a80b2af5ab", SYMLINK+="rplidar"

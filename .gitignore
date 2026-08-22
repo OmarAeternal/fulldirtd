@@ -1,0 +1,53 @@
+# ─── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# ─── ROS 2 (hasil colcon build, bisa dibangun ulang) ──────
+build/
+install/
+log/
+devel/
+.catkin_tools/
+
+# ─── Data hasil scan & point cloud (besar, simpan terpisah) ─
+*.mcap
+*.bag
+*.db3
+*.pcd
+*.ply
+*.las
+*.laz
+*.pcap
+*.xyz
+*.pts
+
+# basis data SLAM (bisa dibangun ulang)
+*.db
+rtabmap.db
+
+# folder output olahan
+cloudcom/out/
+**/out/_merge*/
+**/out/_outmerge/
+
+# ─── Editor / OS ──────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# ─── Lain-lain ────────────────────────────────────────────
+*.log
+*.tmp
+node_modules/
+
+# Pengaturan lokal Claude Code
+.claude/settings.local.json
