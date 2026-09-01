@@ -441,12 +441,18 @@ def _jarak_ke_tembok(titik, atlas) -> float:
     return float(min(abs(float(np.dot(m[:3], titik) + m[3])) for m in tegak))
 
 
-def daftar_benda(xyz: np.ndarray, atlas: list = None) -> list:
+def daftar_benda(xyz: np.ndarray, atlas: list = None,
+                 max_tapak: float = BENDA_MAX_TAPAK) -> list:
     """Gugus menonjol yang berdiri sendiri, sudah disaring. Rig sudah dibuang.
 
     Saringannya bukan hiasan. Di data asli titik menonjol mencapai 34-42% dari
     seluruh titik — tembok bengkok dan kanopi bocor lewat pengupasan sebagai
     "ciri". Saringan tapak/tinggi membuangnya dan menyisakan 6-21 benda per scan.
+
+    Tapi ia juga bisa membuang benda sungguhan tanpa bersuara: pada scan_0083
+    huruf M punya 1.949 titik — terpadat kedua di scan itu — dan tetap ditolak
+    karena tapaknya 1,65 m. `max_tapak` ada supaya adegan berhuruf lebar bisa
+    melonggarkannya tanpa mengubah bawaan yang menjaga adegan lain.
     """
     o3d = _o3d()
     xyz = np.asarray(xyz, dtype=np.float64)
@@ -472,7 +478,7 @@ def daftar_benda(xyz: np.ndarray, atlas: list = None) -> list:
         if len(q) < BENDA_MIN_TITIK:
             continue
         ukuran = q.max(axis=0) - q.min(axis=0)
-        if max(ukuran[0], ukuran[1]) > BENDA_MAX_TAPAK:
+        if max(ukuran[0], ukuran[1]) > max_tapak:
             continue
         if ukuran[2] > BENDA_MAX_TINGGI:
             continue
@@ -694,7 +700,7 @@ def pose_jangkar(benda_s, benda_a, pasangan,
 
 
 def pasang(sumber, acuan, benda_s, benda_a, pasangan,
-           redam: float = REDAM) -> dict:
+           redam: float = REDAM, icp: bool = True) -> dict:
     """Selesaikan pose sumber di kerangka acuan dari jangkar yang ditunjuk.
 
     → dict berisi T, asal_yaw, sisa_jangkar, geser_perapian, nilai, peringatan.
@@ -721,7 +727,11 @@ def pasang(sumber, acuan, benda_s, benda_a, pasangan,
         skor = [nilai(sumber, acuan, T)["tajam3"] for T in kandidat]
         T_jangkar = kandidat[int(np.argmax(skor))]
 
-    T = rapikan(sumber, acuan, T_jangkar, redam=redam)
+    # `icp=False` menyerahkan pose apa adanya dari jangkar. Dipakai bila
+    # tampalannya terlalu tipis untuk dipoles: terukur pada tepi 0082-0083,
+    # jawaban jangkar tepat 1,1 cm lalu ICP menyeretnya 1,62 m. `redam` tak
+    # menolong di situ — ia hanya meredam arah lemah, seretannya tegak lurus.
+    T = rapikan(sumber, acuan, T_jangkar, redam=redam) if icp else T_jangkar.copy()
 
     Q = np.array([benda_s[i].pusat for i, _ in pasangan], dtype=np.float64)
     P = np.array([benda_a[j].pusat for _, j in pasangan], dtype=np.float64)
@@ -741,7 +751,7 @@ def pasang(sumber, acuan, benda_s, benda_a, pasangan,
         peringatan.append(
             f"sisa jangkar {sisa:.2f} m, paling menyimpang jangkar ke-"
             f"{int(np.argmax(per_jangkar))}")
-    if geser > 0.5:
+    if icp and geser > 0.5:
         peringatan.append(
             f"perapian menggeser {geser:.2f} m dari jawaban jangkar — "
             f"redamannya bocor, atau jangkarnya salah")
@@ -879,7 +889,9 @@ def siapkan(args) -> None:
         xyz = terapkan(xyz, T)
         atlas = atlas_bidang(xyz)
         bersih, rig = buang_rig(xyz, atlas)
-        daftar = daftar_benda(xyz, atlas)
+        daftar = daftar_benda(xyz, atlas,
+                              max_tapak=getattr(args, 'max_tapak',
+                                                BENDA_MAX_TAPAK))
 
         _tulis_ply(d / "awan" / f"{nama}.ply", bersih)
         tulis_benda_ply(d / f"{nama}_benda.ply", daftar)
@@ -959,7 +971,7 @@ def selesaikan(args) -> None:
                 raise SystemExit(
                     f"[ERROR] pasangan {a}#{i} = {b}#{j} menyebut benda yang "
                     f"tidak ada — jangan dilewati diam-diam")
-        tepi[(a, b)] = jangkar
+        tepi[(a, b)] = (jangkar, bool(e.get("icp", True)))
 
     komponen = _komponen(list(katalog), tepi)
     if len(komponen) > 1:
@@ -973,14 +985,15 @@ def selesaikan(args) -> None:
         antre = [akar]
         while antre:
             u = antre.pop(0)
-            for (a, b), jangkar in tepi.items():
+            for (a, b), (jangkar, pakai_icp) in tepi.items():
                 for src, dst, jk in ((a, b, jangkar),
                                      (b, a, [(j, i) for i, j in jangkar])):
                     if dst != u or src in pose:
                         continue
-                    print(f"\n[{src}] → [{dst}]  ({len(jk)} jangkar)")
+                    print(f"\n[{src}] → [{dst}]  ({len(jk)} jangkar"
+                          f"{'' if pakai_icp else ', tanpa ICP'})")
                     h = pasang(awan[src], awan[dst], benda[src], benda[dst],
-                               jk, redam=args.redam)
+                               jk, redam=args.redam, icp=pakai_icp)
                     pose[src] = pose[dst] @ h["T"]
                     catatan[src] = h
                     n = h["nilai"]
@@ -1130,6 +1143,11 @@ def build_parser():
                         "memburukkan penilaian tajam 0,25-0,46 → 0,08-0,12")
     s.add_argument("-t", "--topic", default=None, help="topik PointCloud2")
     s.add_argument("--force", action="store_true", help="paksa konversi ulang mcap")
+    s.add_argument("--max-tapak", type=float, default=BENDA_MAX_TAPAK,
+                   dest="max_tapak",
+                   help=f"tapak mendatar terbesar yang masih dianggap benda, "
+                        f"meter (baku {BENDA_MAX_TAPAK}); naikkan bila ada "
+                        f"huruf atau benda lebar yang tak terpetik")
     s.set_defaults(fungsi=siapkan)
 
     k = sub.add_parser("selesaikan", help="selesaikan pose dari jangkar yang ditunjuk")

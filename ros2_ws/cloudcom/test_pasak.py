@@ -104,7 +104,7 @@ def test_sisa_tiga_jangkar_menunjuk_yang_menyimpang():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def selasar(seed=0, rig=True, tiang=True, tembok_dekat=False,
-            tembok_lipat=1, gundukan=False) -> np.ndarray:
+            tembok_lipat=1, gundukan=False, huruf_lebar=False) -> np.ndarray:
     """Tanah + tembok panjang polos + tiga tiang + rig di titik asal.
 
     Tiruan selasar FILKOM: temboknya mendominasi jumlah titik dan sama saja
@@ -153,6 +153,29 @@ def selasar(seed=0, rig=True, tiang=True, tembok_dekat=False,
             -6.0 + 2.6 * t,
             -3.0 + 0.9 * np.sin(np.pi * t) + rng.normal(0, 0.004, n),
             rng.uniform(0.2, 2.2, n)]))
+
+    if huruf_lebar:
+        # Huruf timbul selebar 1,65 m di tembok — seperti M pada FILKOM.
+        # Ia benda sungguhan (berdiri di tanah, menempel tembok, padat), tapi
+        # tapaknya melewati BENDA_MAX_TAPAK bawaan 1,5 m.
+        #
+        # Dibuat BERELIEF, bukan lembaran datar: relief huruf FILKOM terukur
+        # 5-15 cm, dan lembaran datar akan diserap atlas sebagai bidang lalu
+        # dikupas — yang diuji di sini saringan tapak, bukan pengupasan bidang.
+        x0, x1 = -6.40, -4.75
+        y_muka = 1.20 - 0.22
+        for dy in (0.0, 0.10):                        # muka depan dan belakang
+            n = 1500
+            bagian.append(np.column_stack([
+                rng.uniform(x0, x1, n),
+                y_muka + dy + rng.normal(0, 0.004, n),
+                rng.uniform(0.05, 1.95, n)]))
+        for xs in (x0, x1):                           # sisi kiri dan kanan
+            n = 700
+            bagian.append(np.column_stack([
+                xs + rng.normal(0, 0.004, n),
+                rng.uniform(y_muka, y_muka + 0.10, n),
+                rng.uniform(0.05, 1.95, n)]))
 
     if tembok_dekat:
         # tembok di x = +0,49 — DI DALAM radius buang-rig, dan harus selamat
@@ -293,6 +316,46 @@ def test_daftar_benda_membuang_gugus_raksasa():
     assert all(b.pusat[0] > -5.0 or b.ukuran[0] < 1.0 for b in daftar)
 
 
+def test_daftar_benda_ambang_tapak_bisa_dilonggarkan():
+    """Huruf lebar seperti M ditolak ambang bawaan; itu harus bisa dilonggarkan.
+
+    Terukur pada scan_0083: M punya 1.949 titik — benda terpadat kedua di
+    scan itu — tapi tapaknya 1,65 m, jadi ia ditolak diam-diam oleh ambang
+    1,5 m yang dipasang untuk membuang sisa tembok. Kehilangan M berarti
+    kehilangan jangkar kedua untuk pasangan 0082-0083.
+    """
+    pk.seed(7)
+    xyz = selasar(seed=9, rig=True, huruf_lebar=True)
+    xyz = pk.terapkan(xyz, pk.kerangka_tanah(xyz))
+
+    def punya_huruf(daftar):
+        return [b for b in daftar
+                if abs(b.pusat[0] - (-5.58)) < 0.35 and b.ukuran[2] > 1.2]
+
+    bawaan = pk.daftar_benda(xyz)
+    assert not punya_huruf(bawaan), \
+        "huruf 1,65 m seharusnya ditolak ambang bawaan 1,5 m"
+
+    longgar = pk.daftar_benda(xyz, max_tapak=1.8)
+    ketemu = punya_huruf(longgar)
+    assert len(ketemu) == 1, f"huruf lebar tidak terpetik; dapat {len(ketemu)}"
+    assert 1.5 < max(ketemu[0].ukuran[0], ketemu[0].ukuran[1]) <= 1.8
+
+    # melonggarkan tidak boleh menelan tiang yang sudah ketemu
+    assert len(longgar) >= len(bawaan)
+
+
+def test_daftar_benda_ambang_longgar_tetap_menolak_gugus_raksasa():
+    """Longgar bukan berarti tanpa penjaga — gundukan 2,6 m tetap harus ditolak."""
+    pk.seed(7)
+    xyz = selasar(seed=7, rig=True, gundukan=True)
+    xyz = pk.terapkan(xyz, pk.kerangka_tanah(xyz))
+
+    for b in pk.daftar_benda(xyz, max_tapak=1.8):
+        assert max(b.ukuran[0], b.ukuran[1]) <= 1.8
+        assert b.ukuran[2] <= pk.BENDA_MAX_TINGGI
+
+
 def test_daftar_benda_tidak_memasukkan_rig():
     """Rig sudah dibuang sebelum pencarian benda; ia tak boleh muncul di daftar."""
     pk.seed(7)
@@ -365,6 +428,43 @@ def test_pasang_mengembalikan_geseran_satu_koma_dua_meter():
 
     galat = np.linalg.norm((hasil["T"] @ T_benar)[:2, 3])
     assert galat < 0.02, f"masih meleset {galat:.3f} m"
+
+
+def test_pasang_icp_mati_memakai_jawaban_jangkar_apa_adanya():
+    """Bila tampalannya tipis, ICP merusak jawaban jangkar yang sudah benar.
+
+    Terukur pada tepi 0082-0083: jawaban jangkar menaruh O di O dan M di M
+    dalam 1,1 cm, lalu ICP menyeretnya 1,62 m dan meninggalkannya 0,73 m
+    meleset — tampalannya cuma 203 titik. `--redam` tidak menolong karena ia
+    hanya meredam arah lemah, sementara seretan itu tegak lurus tembok.
+    """
+    pk.seed(3)
+    T_benar = _geser(1.2)
+    sumber, acuan = _dua_scan(T_benar)
+    bs, ba = pk.daftar_benda(sumber), pk.daftar_benda(acuan)
+    pasangan = _jodohkan(bs, ba, T_benar)
+    assert len(pasangan) >= 2
+
+    hasil = pk.pasang(sumber, acuan, bs, ba, pasangan, icp=False)
+
+    assert np.allclose(hasil["T"], hasil["T_jangkar"], atol=1e-12), \
+        "icp=False harus mengembalikan jawaban jangkar tanpa disentuh"
+    assert hasil["geser_perapian"] == 0.0
+    # dan ia tetap jawaban yang benar, bukan sekadar tak tersentuh
+    assert np.linalg.norm((hasil["T"] @ T_benar)[:2, 3]) < 0.05
+
+
+def test_pasang_icp_hidup_secara_bawaan():
+    """Bawaannya tetap memoles — tepi bertampalan tebal memang lebih baik dipoles."""
+    pk.seed(3)
+    T_benar = _geser(0.4, -0.3, yaw=8.0)
+    sumber, acuan = _dua_scan(T_benar)
+    bs, ba = pk.daftar_benda(sumber), pk.daftar_benda(acuan)
+    pasangan = _jodohkan(bs, ba, T_benar)
+
+    hasil = pk.pasang(sumber, acuan, bs, ba, pasangan)
+
+    assert not np.allclose(hasil["T"], hasil["T_jangkar"], atol=1e-9)
 
 
 def test_pasang_mengembalikan_yaw_delapan_derajat():
