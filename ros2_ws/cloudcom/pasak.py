@@ -22,6 +22,7 @@ Rancangan lengkap beserta angka diagnosisnya:
     docs/superpowers/specs/2026-08-23-pasak-design.md
 """
 
+import math
 import numpy as np
 
 
@@ -641,6 +642,79 @@ def rapikan(sumber, acuan, T0, redam: float = REDAM) -> np.ndarray:
     return T
 
 
+TEGAK_MIN_TITIK = 4000   # bidang tegak lebih kecil dari ini bukan tembok
+TEGAK_MAKS = 15.0        # koreksi lebih besar dari ini: curigai, jangan pakai
+
+
+def tegakkan_tembok(xyz: np.ndarray, atlas: list, maks: float = TEGAK_MAKS):
+    """Koreksi roll/pitch memakai tembok sebagai acuan tegak, bukan tanah.
+
+    → 4x4, atau None bila tak ada tembok yang cukup besar.
+
+    `kerangka_tanah` meratakan ke tanah, dan itu benar HANYA bila tanahnya
+    tegak lurus gravitasi. Di FILKOM tidak: terukur pada scan_0080-0083,
+    sesudah perataan tanah tembok yang seharusnya tegak condong 4,2-8,7 deg,
+    dan keempat scan jadi saling miring sampai 9,6 deg. Bangunan dibangun
+    tegak lurus gravitasi; tanah punya kemiringan buangan air. Temboknya acuan
+    yang lebih baik.
+
+    BATASNYA, dan ini bukan cacat yang bisa ditambal parameter: tembok hanya
+    mengunci kemiringan pada sumbu TANGENnya. Memiringkan awan pada sumbu
+    normal tembok memetakan bidang tembok ke dirinya sendiri, jadi ketegakannya
+    tak berubah. Perlu dua tembok dengan arah normal berbeda untuk mengunci
+    keduanya; di scan_0080-0083 hanya ada satu arah (sebaran azimut 0,1-0,5
+    deg), jadi satu derajat tetap memakai jawaban tanah. Koreksi yang diambil
+    di sini yang TERKECIL — arah tegak baru dipilih yang paling dekat dengan
+    tegak lama — supaya derajat yang tak terkunci tidak ikut tergeser.
+    """
+    xyz = np.asarray(xyz, dtype=np.float64)
+    tegak = []
+    for m in atlas:
+        if abs(m[2]) >= 0.5:
+            continue
+        n = int((np.abs(xyz @ m[:3] + m[3]) < PLANE_TOL) .sum())
+        if n >= TEGAK_MIN_TITIK:
+            tegak.append((n, m[:3]))
+    if not tegak:
+        return None
+
+    # Normal rata-rata berbobot jumlah titik. Tanda disamakan dulu supaya
+    # dua sisi tembok yang sama tidak saling meniadakan.
+    acuan = max(tegak, key=lambda e: e[0])[1]
+    N = np.zeros(3)
+    for n, v in tegak:
+        N += n * (v if float(np.dot(v, acuan)) >= 0 else -v)
+    N /= np.linalg.norm(N)
+
+    z = np.array([0.0, 0.0, 1.0])
+    tegak_baru = z - float(np.dot(z, N)) * N        # komponen z yang tegak lurus N
+    norm = float(np.linalg.norm(tegak_baru))
+    if norm < 1e-9:
+        return None
+    tegak_baru /= norm
+
+    sudut = math.acos(float(np.clip(np.dot(tegak_baru, z), -1.0, 1.0)))
+    if math.degrees(sudut) > maks:
+        return None
+    if sudut < 1e-9:
+        return np.eye(4)
+
+    sumbu = np.cross(tegak_baru, z)
+    sumbu /= np.linalg.norm(sumbu)
+    K = np.array([[0, -sumbu[2], sumbu[1]],
+                  [sumbu[2], 0, -sumbu[0]],
+                  [-sumbu[1], sumbu[0], 0]], dtype=np.float64)
+    R = np.eye(3) + math.sin(sudut) * K + (1 - math.cos(sudut)) * (K @ K)
+
+    T = np.eye(4)
+    T[:3, :3] = R
+    # Tanah tetap di z = 0: putaran di atas dilakukan terhadap titik asal.
+    dekat = xyz[np.abs(xyz[:, 2]) < 0.30]
+    if len(dekat) > 200:
+        T[2, 3] = -float(np.median((dekat @ R.T)[:, 2]))
+    return T
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Tembok utama — cadangan yaw saat jangkarnya cuma satu
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -888,6 +962,18 @@ def siapkan(args) -> None:
             continue
         xyz = terapkan(xyz, T)
         atlas = atlas_bidang(xyz)
+
+        if getattr(args, "tegakkan", False):
+            T2 = tegakkan_tembok(xyz, atlas)
+            if T2 is None:
+                print(f"[{nama}] tidak ada tembok cukup besar — tetap pakai tanah")
+            else:
+                sudut = math.degrees(math.acos(float(np.clip(T2[2, 2], -1, 1))))
+                print(f"[{nama}] ditegakkan ke tembok: koreksi {sudut:.2f} derajat")
+                xyz = terapkan(xyz, T2)
+                atlas = atlas_bidang(xyz)
+                T = T2 @ T
+
         bersih, rig = buang_rig(xyz, atlas)
         daftar = daftar_benda(xyz, atlas,
                               max_tapak=getattr(args, 'max_tapak',
@@ -1143,6 +1229,9 @@ def build_parser():
                         "memburukkan penilaian tajam 0,25-0,46 → 0,08-0,12")
     s.add_argument("-t", "--topic", default=None, help="topik PointCloud2")
     s.add_argument("--force", action="store_true", help="paksa konversi ulang mcap")
+    s.add_argument("--tegakkan", action="store_true",
+                   help="pakai tembok sebagai acuan tegak, bukan tanah; "
+                        "membetulkan roll/pitch bila tanahnya miring")
     s.add_argument("--max-tapak", type=float, default=BENDA_MAX_TAPAK,
                    dest="max_tapak",
                    help=f"tapak mendatar terbesar yang masih dianggap benda, "

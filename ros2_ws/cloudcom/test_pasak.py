@@ -407,6 +407,81 @@ def _jodohkan(benda_s, benda_a, T_benar, batas=0.35):
     return pasangan
 
 
+def _lorong_tanah_miring(seed=0, miring_deg=6.0):
+    """Tembok BENAR-BENAR tegak, tanah miring `miring_deg`.
+
+    Ini keadaan di FILKOM: bangunan dibangun tegak lurus gravitasi, tanahnya
+    punya kemiringan buangan air. `kerangka_tanah` meratakan ke tanah, jadi
+    temboknya ikut tercondong sebesar kemiringan tanah itu.
+    """
+    rng = np.random.default_rng(seed)
+    k = np.tan(np.radians(miring_deg))
+    bagian = []
+    n = 22000
+    x = rng.uniform(-6, 6, n); y = rng.uniform(-5, 5, n)
+    bagian.append(np.column_stack([x, y, k * x + rng.normal(0, 0.004, n)]))
+    for x0 in (-1.6, 2.4):                       # dua tembok SEJAJAR, tegak
+        n = 20000
+        y = rng.uniform(-5, 5, n)
+        bagian.append(np.column_stack([x0 + rng.normal(0, 0.004, n), y,
+                                       rng.uniform(0.05, 3.0, n)]))
+    return np.vstack(bagian)
+
+
+def _condong_tembok(xyz, x0):
+    """Sudut normal tembok terdekat x0 dari bidang mendatar, derajat."""
+    q = xyz[np.abs(xyz[:, 0] - x0) < 0.9]
+    q = q[(q[:, 2] > 0.3) & (q[:, 2] < 2.8)]
+    c = q.mean(0)
+    _, _, vt = np.linalg.svd(q - c, full_matrices=False)
+    return np.degrees(np.arcsin(min(1.0, abs(vt[2][2]))))
+
+
+def test_tegakkan_tembok_membetulkan_tanah_yang_miring():
+    """Tanah miring 6 deg membuat tembok tegak jadi condong 6 deg; ini membetulkannya.
+
+    Terukur di scan_0080-0083: sesudah perataan tanah, tembok yang seharusnya
+    tegak condong 4,2-8,7 deg, dan keempat scan jadi saling miring sampai 9,6 deg.
+    """
+    pk.seed(11)
+    xyz = _lorong_tanah_miring(seed=11, miring_deg=6.0)
+    rata = pk.terapkan(xyz, pk.kerangka_tanah(xyz))
+
+    sebelum = max(_condong_tembok(rata, -1.6), _condong_tembok(rata, 2.4))
+    assert sebelum > 4.0, f"tiruannya tidak mereproduksi masalahnya ({sebelum:.2f} deg)"
+
+    T = pk.tegakkan_tembok(rata, pk.atlas_bidang(rata))
+    assert T is not None
+    tegak = pk.terapkan(rata, T)
+
+    sesudah = max(_condong_tembok(tegak, -1.6), _condong_tembok(tegak, 2.4))
+    assert sesudah < 0.5, f"masih condong {sesudah:.2f} deg (sebelumnya {sebelum:.2f})"
+
+
+def test_tegakkan_tembok_tidak_merusak_yang_sudah_tegak():
+    """Tanpa kemiringan, ia tidak boleh memutar apa pun."""
+    pk.seed(11)
+    xyz = _lorong_tanah_miring(seed=12, miring_deg=0.0)
+    rata = pk.terapkan(xyz, pk.kerangka_tanah(xyz))
+
+    T = pk.tegakkan_tembok(rata, pk.atlas_bidang(rata))
+
+    if T is not None:
+        assert pk.terapkan(rata, T) is not None
+        sudut = np.degrees(np.arccos(np.clip(T[2, 2], -1, 1)))
+        assert sudut < 0.5, f"memutar {sudut:.2f} deg padahal sudah tegak"
+
+
+def test_tegakkan_tembok_tanpa_tembok_mengembalikan_none():
+    """Tanpa bidang tegak yang cukup besar, jangan mengarang jawaban."""
+    pk.seed(11)
+    rng = np.random.default_rng(3)
+    n = 20000
+    tanah = np.column_stack([rng.uniform(-6, 6, n), rng.uniform(-5, 5, n),
+                             rng.normal(0, 0.004, n)])
+    assert pk.tegakkan_tembok(tanah, pk.atlas_bidang(tanah)) is None
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # pasang — jangkar menyelesaikan, bukan mencari
 # ═══════════════════════════════════════════════════════════════════════════════
