@@ -482,6 +482,89 @@ def test_tegakkan_tembok_tanpa_tembok_mengembalikan_none():
     assert pk.tegakkan_tembok(tanah, pk.atlas_bidang(tanah)) is None
 
 
+def _lantai_miring(seed=0, kemiringan=0.03, luas=6.0, n=30000):
+    """Satu lantai yang memang miring — dipakai bersama oleh beberapa scan."""
+    rng = np.random.default_rng(seed)
+    x = rng.uniform(-luas, luas, n)
+    y = rng.uniform(-luas, luas, n)
+    return np.column_stack([x, y, kemiringan * x + rng.normal(0, 0.004, n)])
+
+
+def _condongkan(xyz, deg, sumbu="y"):
+    a = np.radians(deg)
+    c, s = np.cos(a), np.sin(a)
+    R = (np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]]) if sumbu == "y"
+         else np.array([[1, 0, 0], [0, c, -s], [0, s, c]]))
+    return xyz @ R.T
+
+
+def _beda_lantai(awan, pose, sel=0.30):
+    """Beda tinggi lantai antar scan pada petak yang sama. Meter."""
+    kotak = {}
+    for nm, p in awan.items():
+        g = pk.terapkan(p, pose[nm])
+        g = g[np.abs(g[:, 2]) < 0.35]
+        ij = np.floor(g[:, :2] / sel).astype(np.int64)
+        k = ij[:, 0] * 100003 + ij[:, 1]
+        for kk in np.unique(k):
+            m = k == kk
+            if m.sum() < 20:
+                continue
+            kotak.setdefault(kk, {})[nm] = float(np.median(g[m, 2]))
+    v = [max(dd.values()) - min(dd.values()) for dd in kotak.values() if len(dd) >= 2]
+    return float(np.median(v)) if v else 0.0
+
+
+def test_koreksi_lantai_menyambungkan_lantai_yang_saling_miring():
+    """Lantai itu SATU benda; scan yang meratakannya sendiri-sendiri jadi tak sambung.
+
+    Terukur pada scan_0080-0083: meratakan tiap scan ke tanah lokalnya membuat
+    keempatnya saling miring sampai 9,6 derajat, dan potongan lantainya berbeda
+    tinggi rata 9,3 cm. Yang membetulkannya bukan model permukaan, melainkan
+    syarat bahwa dua scan yang melihat petak sama harus sepakat.
+    """
+    pk.seed(5)
+    dasar = _lantai_miring(seed=5)
+    awan = {"a": _condongkan(dasar, +2.5),
+            "b": _condongkan(_lantai_miring(seed=6), -2.0),
+            "c": _condongkan(_lantai_miring(seed=7), +1.0)}
+    pose = {nm: np.eye(4) for nm in awan}
+
+    sebelum = _beda_lantai(awan, pose)
+    assert sebelum > 0.04, f"tiruannya tidak mereproduksi masalahnya ({sebelum:.3f} m)"
+
+    K = pk.koreksi_lantai(awan, pose)
+
+    assert set(K) == set(awan)
+    sesudah = _beda_lantai({nm: pk.terapkan(awan[nm], K[nm]) for nm in awan}, pose)
+    assert sesudah < 0.25 * sebelum, \
+        f"masih {sesudah*100:.1f} cm (sebelumnya {sebelum*100:.1f} cm)"
+
+
+def test_koreksi_lantai_tidak_menggeser_yang_sudah_sepakat():
+    """Kalau lantainya sudah sambung, jangan memutar apa pun."""
+    pk.seed(5)
+    awan = {"a": _lantai_miring(seed=8), "b": _lantai_miring(seed=9)}
+    pose = {nm: np.eye(4) for nm in awan}
+
+    K = pk.koreksi_lantai(awan, pose)
+
+    for nm, T in K.items():
+        sudut = np.degrees(np.arccos(np.clip(T[2, 2], -1, 1)))
+        assert sudut < 0.5, f"{nm} diputar {sudut:.2f} derajat padahal sudah sepakat"
+        assert abs(T[2, 3]) < 0.03
+
+
+def test_koreksi_lantai_tanpa_petak_bersama_mengembalikan_satuan():
+    """Tanpa lantai bersama tak ada yang bisa disimpulkan — jangan mengarang."""
+    pk.seed(5)
+    a = _lantai_miring(seed=10, luas=2.0)
+    b = _lantai_miring(seed=11, luas=2.0) + np.array([40.0, 40.0, 0.0])
+    K = pk.koreksi_lantai({"a": a, "b": b}, {"a": np.eye(4), "b": np.eye(4)})
+    for T in K.values():
+        assert np.allclose(T, np.eye(4), atol=1e-9)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # pasang — jangkar menyelesaikan, bukan mencari
 # ═══════════════════════════════════════════════════════════════════════════════

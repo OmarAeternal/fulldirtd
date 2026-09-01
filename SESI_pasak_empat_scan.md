@@ -39,12 +39,12 @@ serong).
 
 ## `pasangan.json` yang dipakai
 
-Semua dijalankan dengan `--redam 0.0`.
+Semua dijalankan dengan `--redam 0.0 --sambung-lantai`.
 
 ```json
 {"pasangan": [
   {"a":"scan_0080_1sweep_0","b":"scan_0083_1sweep_0","jangkar":[[1,0],[2,1]]},
-  {"a":"scan_0082_1sweep_0","b":"scan_0083_1sweep_0","jangkar":[[8,5],[7,4]],"icp":false},
+  {"a":"scan_0082_1sweep_0","b":"scan_0083_1sweep_0","jangkar":[[10,5],[8,4]],"icp":false},
   {"a":"scan_0081_1sweep_0","b":"scan_0083_1sweep_0","jangkar":[[8,2],[7,7]],"icp":false}
 ]}
 ```
@@ -53,9 +53,25 @@ Slot `002` dibuat dengan `siapkan ... --max-tapak 1.8`. **Nomor benda di slot
 lain akan berbeda** — jangan salin angka ini ke slot baru tanpa memetakan ulang.
 
 Huruf di slot 002: 0080 F#0 I#1 L#2 K#3 O#7 · 0083 I#0 L#1 K#2 O#4 M#5 ·
-0082 M#8 O#7 · 0081 K#8.
+0082 M#10 O#8 K#7 · 0081 K#8.
 
-## TIGA TITIK BUTA VERIFIKASI — ini temuan pokok sesi ini
+## Perintah yang mereproduksi hasil ini
+
+```bash
+cd ~/"riset td/cloudcom"
+PY=~/"riset td/ros2_ws/cloudcom/.venv/bin/python"
+PASAK=~/"riset td/ros2_ws/cloudcom/pasak.py"
+$PY $PASAK siapkan scan_008[0-3]_1sweep_0.mcap --max-tapak 1.8
+# isi pasangan.json seperti di atas, lalu:
+$PY $PASAK selesaikan out/_pasak/00N --redam 0.0 --sambung-lantai
+```
+
+`--sambung-lantai` menyelesaikan pose, menyamakan kemiringan antar scan lewat
+lantai bersama, lalu menyelesaikan pose ULANG dengan jangkar yang sama.
+Terukur menaikkan titik bertampalan dari 723/1.418/442 ke 1.032/2.323/1.491,
+dan menurunkan beda tinggi lantai antar scan dari 9,3 cm ke 2,5 cm.
+
+## EMPAT TITIK BUTA VERIFIKASI — ini temuan pokok sesi ini
 
 Ketiganya terukur **memihak jawaban yang salah**, bukan sekadar lemah.
 
@@ -70,6 +86,20 @@ Ketiganya terukur **memihak jawaban yang salah**, bukan sekadar lemah.
    tanpa mengubah sisa jangkar sedikit pun (0,023 m di kedua pilihan). O dan M
    sama-sama simetris kiri-kanan sehingga dari belakang tampak sama — mata pun
    bisa tertukar, dan memang tertukar sekali di sesi ini.
+
+4. **Sisa jangkar memihak pemasangan yang salah.** Pada tepi 0082 pemasangan
+   yang SALAH memberi sisa 0,023 m sementara yang benar 0,199 m — yang salah
+   tampak empat kali lebih meyakinkan. Sebabnya dua benda yang kebetulan
+   berjarak pas selalu bisa dipasangkan rapi. Yang membongkarnya benda KETIGA
+   yang tidak ikut dijangkar: ia melayang 1,42 m di luar deret, dan tidak ada
+   satu pun angka di laporan yang menyebutkannya. Ditemukan oleh mata pengguna,
+   bukan oleh alat ukur.
+
+   **Aturan yang lahir dari ini: jangan pernah menjangkar dengan semua benda
+   yang dikenali; selalu sisakan minimal satu sebagai pemeriksa.** Dan pilih
+   jangkar dari benda yang paling banyak titiknya — kesalahan di sesi ini:
+   dipakai benda 188 titik padahal ada yang 1.173 titik, dan titik-pusat benda
+   yang cuma terlihat sebagian itu bias.
 
 **Wasit yang akhirnya sah: kesinambungan struktur DI LUAR ciri penjangkar.**
 Dinding x≈4,05 tersambung penuh dari empat scan dengan jangkauan y yang saling
@@ -101,7 +131,25 @@ Commit `7a00207` di branch `pasak-tapak-dan-icp`. 34 tes lulus.
 
 ## BELUM DIKERJAKAN
 
-### 1. Kemiringan sisa — ini yang paling terlihat
+### 1. Tegak mutlak — kemiringan serempak yang tersisa
+
+Sesudah `--sambung-lantai`, keempat scan SEPAKAT satu sama lain (beda tinggi
+lantai 2,5 cm rata, 1,5 cm median) tapi seluruh peta masih miring serempak:
+tembok masih condong 4-8 derajat. Itu kesalahan yang sama untuk semuanya, jadi
+satu putaran global menyelesaikannya dan tidak bisa merusak kesambungan.
+
+**Yang sudah dicoba dan GAGAL: menegakkan per scan ke tembok** (`siapkan
+--tegakkan`, commit 1b8b1a4). Ketegakan tembok memang membaik (8,2 -> 0,1
+derajat) tapi kesambungan lantai MEMBURUK dari 9,3 cm ke 21,1 cm. Sebabnya satu
+arah normal tembok hanya mengunci satu dari dua derajat kemiringan; sumbu
+sisanya tetap memakai jawaban tanah, dan kerangka campuran begitu tidak
+konsisten antar scan. Bendera itu masih ada tapi **jangan dipakai** sampai ada
+tembok dengan dua arah normal berbeda (sebaran azimut > 20 derajat; di sini
+0,1-0,5 derajat).
+
+Catatan rancangan lengkap: `ros2_ws/cloudcom/docs/algoritma-pemetaan-luar-ruang.md`
+
+### 1b. Diagnosis kemiringan yang mendasarinya
 
 Dinding yang seharusnya tegak condong, konsisten di dalam tiap scan:
 

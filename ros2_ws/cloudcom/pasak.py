@@ -715,6 +715,119 @@ def tegakkan_tembok(xyz: np.ndarray, atlas: list, maks: float = TEGAK_MAKS):
     return T
 
 
+LANTAI_SEL = 0.30        # sisi petak lantai (m)
+LANTAI_PITA = 0.35       # |z| yang masih dianggap lantai (m)
+LANTAI_MIN_TITIK = 20    # titik minimum per petak per scan
+LANTAI_SEBAR = 0.05      # sebaran tinggi persentil 10-90; lebih dari ini bukan lantai rata
+LANTAI_REDAM = 8.0       # tarikan ke koreksi nol, penjaga degenerasi
+LANTAI_PUTARAN = 5
+
+
+def _petak_lantai(awan, pose, koreksi=None):
+    """{kunci petak: {scan: (x, y, z median)}} pada petak yang BENAR lantai rata."""
+    out = {}
+    for nm, p in awan.items():
+        T = pose[nm] if koreksi is None else pose[nm] @ koreksi[nm]
+        g = terapkan(p, T)
+        g = g[np.abs(g[:, 2]) < LANTAI_PITA]
+        if len(g) == 0:
+            continue
+        ij = np.floor(g[:, :2] / LANTAI_SEL).astype(np.int64)
+        kunci = ij[:, 0] * 100003 + ij[:, 1]
+        for k in np.unique(kunci):
+            m = kunci == k
+            if int(m.sum()) < LANTAI_MIN_TITIK:
+                continue
+            z = g[m, 2]
+            if float(np.percentile(z, 90) - np.percentile(z, 10)) > LANTAI_SEBAR:
+                continue
+            out.setdefault(int(k), {})[nm] = (float(np.median(g[m, 0])),
+                                              float(np.median(g[m, 1])),
+                                              float(np.median(z)))
+    return out
+
+
+def koreksi_lantai(awan: dict, pose: dict, putaran: int = LANTAI_PUTARAN) -> dict:
+    """Koreksi roll/pitch/z tiap scan supaya potongan lantainya menyambung.
+
+    → {nama: 4x4} di kerangka scan masing-masing; satuan bila tak ada yang bisa
+    disimpulkan.
+
+    Lantai itu SATU benda fisik dan ia memang miring. `kerangka_tanah`
+    meratakan tiap scan ke petak lantainya SENDIRI, jadi empat potongan lantai
+    yang sama dipaksa datar dengan cara berbeda-beda dan sesudah itu tak bisa
+    disambung. Terukur pada scan_0080-0083: keempat scan saling miring sampai
+    9,6 derajat, beda tinggi lantai rata 9,3 cm.
+
+    Yang dipakai di sini BUKAN model permukaan. Sekali lantai dimodelkan, model
+    itu ikut bergerak mengikuti scan dan tak ada yang mengikat — dicoba, dan
+    hasilnya menyimpang: sisa naik 17 -> 25 cm dengan koreksi membengkak sampai
+    35 derajat. Yang dipakai syarat antar-pasangan: dua scan yang melihat petak
+    lantai yang sama HARUS melaporkan tinggi yang sama. Lantainya boleh semiring
+    apa pun.
+
+    Penyaringan petak menentukan segalanya: petak yang tercemar benda di atasnya
+    (tepi trotoar, kaki huruf, pot) membuat selisihnya bukan lagi soal
+    kemiringan. Dengan semua petak selisih terukur 17,6 cm; dengan hanya petak
+    yang sebaran tingginya di bawah 5 cm, 11,5 cm — dan yang pertama tak bisa
+    diperbaiki koreksi apa pun.
+
+    Gauge dikunci dengan memaksa rata-rata koreksi nol, bukan dengan mematok
+    satu scan sebagai acuan, supaya tak ada scan yang diistimewakan. Ia hanya
+    menyamakan scan SATU SAMA LAIN; tegak mutlak tidak bisa disimpulkan dari
+    lantai dan harus diselesaikan terpisah, sekali, di akhir.
+    """
+    nama = sorted(awan)
+    idx = {nm: i for i, nm in enumerate(nama)}
+    par = {nm: np.zeros(3) for nm in nama}
+
+    def sebagai_T(nm):
+        a, b, dz = par[nm]
+        ca, sa, cb, sb = math.cos(a), math.sin(a), math.cos(b), math.sin(b)
+        R = (np.array([[cb, 0, sb], [0, 1.0, 0], [-sb, 0, cb]])
+             @ np.array([[1.0, 0, 0], [0, ca, -sa], [0, sa, ca]]))
+        o = pose[nm][:2, 3]
+        M = np.eye(4)
+        M[:3, :3] = R
+        M[:3, 3] = np.array([o[0], o[1], 0.0]) - R @ np.array([o[0], o[1], 0.0])
+        M[2, 3] += dz
+        # dibawa ke kerangka scan sendiri supaya bisa dipakai langsung pada awan
+        return np.linalg.inv(pose[nm]) @ M @ pose[nm]
+
+    for _ in range(int(putaran)):
+        petak = _petak_lantai(awan, pose, {nm: sebagai_T(nm) for nm in nama})
+        baris, kanan = [], []
+        for d in petak.values():
+            if len(d) < 2:
+                continue
+            ada = sorted(d)
+            for i in range(len(ada)):
+                for j in range(i + 1, len(ada)):
+                    s, u = ada[i], ada[j]
+                    r = np.zeros(3 * len(nama))
+                    for nm, tanda in ((s, 1.0), (u, -1.0)):
+                        x, y, _ = d[nm]
+                        ox, oy = pose[nm][:2, 3]
+                        k = 3 * idx[nm]
+                        r[k] += tanda * (y - oy)
+                        r[k + 1] += tanda * (-(x - ox))
+                        r[k + 2] += tanda
+                    baris.append(r)
+                    kanan.append(d[u][2] - d[s][2])
+        if not baris:
+            return {nm: np.eye(4) for nm in nama}
+        A = np.vstack([np.array(baris), LANTAI_REDAM * np.eye(3 * len(nama))])
+        c = np.concatenate([np.array(kanan), np.zeros(3 * len(nama))])
+        d_, *_ = np.linalg.lstsq(A, c, rcond=None)
+        for nm in nama:
+            par[nm] = par[nm] + d_[3 * idx[nm]:3 * idx[nm] + 3]
+        rata = np.mean([par[nm] for nm in nama], axis=0)
+        for nm in nama:
+            par[nm] = par[nm] - rata
+
+    return {nm: sebagai_T(nm) for nm in nama}
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Tembok utama — cadangan yaw saat jangkarnya cuma satu
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1059,6 +1172,27 @@ def selesaikan(args) -> None:
                     f"tidak ada — jangan dilewati diam-diam")
         tepi[(a, b)] = (jangkar, bool(e.get("icp", True)))
 
+    pose, catatan = _pose_dari_jangkar(katalog, awan, benda, tepi, args)
+
+    if getattr(args, "sambung_lantai", False):
+        print("\n" + "=" * 66)
+        print("  menyambungkan lantai — scan yang melihat petak sama harus sepakat")
+        print("=" * 66)
+        K = koreksi_lantai(awan, pose)
+        for nm in sorted(K):
+            sudut = math.degrees(math.acos(float(np.clip(K[nm][2, 2], -1, 1))))
+            print(f"  {nm:<34} putar {sudut:5.2f} deg, geser z {K[nm][2, 3]*100:+5.1f} cm")
+            awan[nm] = terapkan(awan[nm], K[nm])
+            for b in benda[nm]:
+                b.pusat = (K[nm] @ np.append(b.pusat, 1.0))[:3]
+                b.titik = np.array([(K[nm] @ np.append(v, 1.0))[:3] for v in b.titik])
+        print("  pose diselesaikan ULANG dengan jangkar yang sama:")
+        pose, catatan = _pose_dari_jangkar(katalog, awan, benda, tepi, args)
+
+    _tulis_hasil(d, awan, pose, catatan, tepi, args)
+
+
+def _pose_dari_jangkar(katalog, awan, benda, tepi, args):
     komponen = _komponen(list(katalog), tepi)
     if len(komponen) > 1:
         print(f"[WARN] Graf jangkar terpisah jadi {len(komponen)} kelompok. "
@@ -1090,7 +1224,7 @@ def selesaikan(args) -> None:
                         print(f"  [WARN] {w}")
                     antre.append(src)
 
-    _tulis_hasil(d, awan, pose, catatan, tepi, args)
+    return pose, catatan
 
 
 def _benda_dari_json(e):
@@ -1242,6 +1376,9 @@ def build_parser():
     k = sub.add_parser("selesaikan", help="selesaikan pose dari jangkar yang ditunjuk")
     k.add_argument("dir", nargs="?", default=None,
                    help="folder hasil siapkan; kosong = yang terakhir")
+    k.add_argument("--sambung-lantai", action="store_true", dest="sambung_lantai",
+                   help="samakan kemiringan antar scan lewat lantai bersama, "
+                        "lalu selesaikan ulang pose dengan jangkar yang sama")
     k.add_argument("--redam", type=float, default=REDAM,
                    help="sisa gerak yang diizinkan sepanjang arah lemah. "
                         "0 membekukan, 1 sama dengan ICP biasa")
