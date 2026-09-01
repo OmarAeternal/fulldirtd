@@ -1,0 +1,7 @@
+{
+ "pasangan": [
+  {"a": "scan_0080_1sweep_0", "b": "scan_0083_1sweep_0", "jangkar": [[1, 0], [2, 1]]},
+  {"a": "scan_0082_1sweep_0", "b": "scan_0083_1sweep_0", "jangkar": [[10, 5], [8, 4]], "icp": false},
+  {"a": "scan_0081_1sweep_0", "b": "scan_0083_1sweep_0", "jangkar": [[8, 2], [7, 7]], "icp": false}
+ ]
+}

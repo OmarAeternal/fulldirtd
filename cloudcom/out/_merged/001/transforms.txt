@@ -1,0 +1,74 @@
+# clomerged — penggabungan sadar fitur
+# Jangkauan dipotong : 6.0 m
+# Sapuan sudut       : tiap 2.0°, 14 puncak teratas
+# Penilaian tajam    : titik menonjol (>0.04 m dari bidang besar), toleransi 0.03 m
+# Pelepasan geseran  : ±1.5 m bila rasio arah lemah < 0.08
+#
+# tajam   = bagian titik MENONJOL yang mendarat tepat di permukaan acuan.
+#           Inilah yang menentukan vonis. Huruf/tiang yang meleset langsung
+#           terhukum karena toleransinya cuma 0.03 m.
+# longgar = takaran lama (10 cm, semua permukaan). Dicantumkan hanya supaya
+#           sebanding dengan run outmerge terdahulu — TIDAK memutuskan apa pun.
+#           longgar tinggi + tajam rendah = menempel di tembok, salah tempat.
+# lemah   = arah gerak yang paling tidak terkunci geometri, dan rasionya.
+#           Rasio kecil berarti hasil bisa tergelincir ke arah itu tanpa
+#           menaikkan galat — di situlah 'FILFILKOM' lahir.
+# unslide = berapa meter hasil digeser sepanjang arah lemah itu untuk
+#           membetulkannya.
+
+# Ringkasan:
+#   scan_0072_1sweep_0.ply                   tajam 0.3000  longgar 0.6886  rmse 0.0202 m  margin +0.0019  BAIK   [ke peta 3 scan lain]
+#   scan_0073_1sweep_0.ply                   tajam 0.4777  longgar 0.8267  rmse 0.0188 m  margin +0.1054  BAIK   [ke peta 3 scan lain]
+#   scan_0074_1sweep_0.ply                   tajam 0.3182  longgar 0.7158  rmse 0.0196 m  margin —  BAIK   [ke peta 3 scan lain]
+#   scan_0075_1sweep_0.ply                   tajam 0.2465  longgar 0.5814  rmse 0.0180 m  margin +0.0378  RAGU   [ke peta 3 scan lain]
+
+# Arah terlemah dan koreksi geseran:
+#   scan_0072_1sweep_0.ply                   geser mendatar (+0.98, -0.19, +0.07) rasio 0.1341   → tidak perlu disapu
+#   scan_0073_1sweep_0.ply                   geser mendatar (+0.93, -0.37, -0.00) rasio 0.0880   → tidak perlu disapu
+#   scan_0074_1sweep_0.ply                   geser mendatar (+0.54, -0.83, -0.13) rasio 0.0517   → digeser +0.000 m
+#   scan_0075_1sweep_0.ply                   geser mendatar (-0.98, +0.18, +0.06) rasio 0.0652   → digeser +0.000 m
+
+# Perataan tanah tiap scan (sudah termasuk di matriks gabungan):
+#   scan_0072_1sweep_0.ply                   13.72° dikoreksi
+#   scan_0073_1sweep_0.ply                   19.09° dikoreksi
+#   scan_0074_1sweep_0.ply                   18.07° dikoreksi
+#   scan_0075_1sweep_0.ply                   18.30° dikoreksi
+
+# Matriks gabungan tiap scan ke kerangka acuan.
+# Sudah termasuk perataan tanah; pakai langsung pada scan asli.
+
+scan_0072_1sweep_0.ply
+  status  : BAIK
+  yaw     : 180.350°
+  matriks :
+    -0.972337  -0.015573   0.233062   1.990539
+    -0.005941  -0.995803  -0.091327   0.044622
+     0.233506  -0.090186   0.968164   1.304549
+     0.000000   0.000000   0.000000   1.000000
+
+scan_0073_1sweep_0.ply
+  status  : BAIK
+  yaw     : 91.288°
+  matriks :
+    -0.020326  -0.999792  -0.001936   1.287539
+     0.904382  -0.017561  -0.426363  -0.525219
+     0.426240  -0.010417   0.904550   1.288712
+     0.000000   0.000000   0.000000   1.000000
+
+scan_0074_1sweep_0.ply
+  status  : BAIK
+  yaw     : 358.340°
+  matriks :
+     0.952900  -0.000838  -0.303283   1.389303
+    -0.027623   0.995600  -0.089543  -0.085307
+     0.302023   0.093703   0.948684   1.349366
+     0.000000   0.000000   0.000000   1.000000
+
+scan_0075_1sweep_0.ply
+  status  : RAGU
+  yaw     : 271.594°
+  matriks :
+     0.027283   0.993868  -0.107155   1.158827
+    -0.980126   0.047667   0.192565   2.871485
+     0.196492   0.099772   0.975416   1.319939
+     0.000000   0.000000   0.000000   1.000000

@@ -1,0 +1,16 @@
+rsync -avzP raspitampan@100.81.62.10:~/bags/scan_008[0-3]_1sweep/*.mcap "/home/bromarku/riset td/cloudcom/"
+
+
+clomerge scan_008[0-3]_1sweep_0.mcap
+
+pcs out/_merge/042/merged.ply
+
+pkill chrome
+
+
+https://zoom.us/j/92810941927?pwd=vTSvMXUzzpvIJzBAA4faI0LRHPhceJ.1
+
+
+
+pcs out/_merge/041/merged.ply
+

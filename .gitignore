@@ -1,4 +1,4 @@
-# ─── Python ───────────────────────────────────────────────
+# ─── Python (bisa dibangun ulang; .venv memuat file 766 MB) ───
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -8,46 +8,49 @@ env/
 .pytest_cache/
 .mypy_cache/
 
-# ─── ROS 2 (hasil colcon build, bisa dibangun ulang) ──────
+# ─── ROS 2 hasil colcon (bisa dibangun ulang; memuat file 128 MB) ───
 build/
 install/
 log/
 devel/
 .catkin_tools/
 
-# ─── Data hasil scan & point cloud (besar, simpan terpisah) ─
-*.mcap
-*.bag
-*.db3
-*.pcd
-*.ply
-*.las
-*.laz
-*.pcap
-*.xyz
-*.pts
+# ─── Tidak diikutkan atas permintaan ───
+backup/
 
-# basis data SLAM (bisa dibangun ulang)
+# ─── Basis data SLAM (bisa dibangun ulang) ───
 *.db
 rtabmap.db
 
-# folder output olahan
-cloudcom/out/
-**/out/_merge*/
-**/out/_outmerge/
+# ─── cloudcom: hanya scan 0080 ke atas ───
+cloudcom/*.mcap
+cloudcom/*.ply
+cloudcom/*.xyz
+!cloudcom/scan_008*
+!cloudcom/scan_009*
+!cloudcom/scan_01*
 
-# ─── Editor / OS ──────────────────────────────────────────
+# ─── cloudcom/out: scan 0080+ dan hasil _pasak / _merged ───
+cloudcom/out/*
+!cloudcom/out/scan_008*
+!cloudcom/out/scan_009*
+!cloudcom/out/scan_01*
+!cloudcom/out/_pasak/
+!cloudcom/out/_merged/
+
+# ─── ros2_ws/cloudcom: scan lama (0001-0005) tidak ikut ───
+ros2_ws/cloudcom/scan_000*
+
+# ─── Editor / OS ───
 .vscode/
 .idea/
 *.swp
 *~
 .DS_Store
 Thumbs.db
-
-# ─── Lain-lain ────────────────────────────────────────────
+node_modules/
 *.log
 *.tmp
-node_modules/
 
-# Pengaturan lokal Claude Code
+# ─── Pengaturan lokal Claude Code ───
 .claude/settings.local.json

@@ -1,0 +1,55 @@
+# pasak — jangkar ditunjuk manusia, geometri diselesaikan mesin
+#
+# Nilai di bawah SELALU berpasangan, tidak pernah melawan peta
+# gabungan. Menilai melawan peta yang tumbuh adalah cara outmerge
+# melaporkan 0,61-0,85 BAIK untuk pose yang berpasangan cuma
+# 0,04-0,22: peta tiga scan kira-kira tiga kali lebih padat, jadi
+# tiap titik punya tiga kali lebih banyak kesempatan menemukan
+# pasangan dalam 10 cm. Angkanya mengikuti kepadatan, bukan kebenaran.
+#
+# fitness@10cm  longgar dan JENUH — 0,4 m dan 1,2 m tak terbedakan
+# tajam@3cm     ketat, hanya pada ciri bukan-bidang — ini yang menolak geseran
+# tampalan      tanpa ini dua angka di atas tak bisa ditafsirkan
+
+# Asal-usul tiap pose:
+#   scan_0083_1sweep_0                 acuan
+#   scan_0080_1sweep_0                 yaw dari jangkar, sisa jangkar 0.010 m, perapian menggeser 0.101 m
+#   scan_0082_1sweep_0                 yaw dari jangkar, sisa jangkar 0.023 m, perapian menggeser 0.000 m
+#   scan_0081_1sweep_0                 yaw dari jangkar, sisa jangkar 0.238 m, perapian menggeser 0.000 m
+
+# Nilai SEMUA pasangan — termasuk yang tidak dijangkari,
+# karena pasangan yang tak dijangkari justru yang paling
+# mungkin diam-diam salah:
+#   0083→0080  fitness 0.308  tajam 0.071  tampalan  1,161  [jangkar]
+#   0083→0082  fitness 0.136  tajam 0.018  tampalan    296  [jangkar]
+#   0083→0081  fitness 0.481  tajam 0.095  tampalan  1,540  [jangkar]
+#   0080→0082  fitness 0.014  tajam 0.001  tampalan     22  [—]
+#   0080→0081  fitness 0.489  tajam 0.039  tampalan    695  [—]
+#   0082→0081  fitness 0.087  tajam 0.015  tampalan    284  [—]
+
+# Matriks tiap scan ke kerangka acuan.
+# Sudah termasuk perataan tanah; pakai langsung pada scan asli.
+
+scan_0083_1sweep_0
+       1.000000   0.000000   0.000000   0.000000
+       0.000000   1.000000   0.000000   0.000000
+       0.000000   0.000000   1.000000   0.000000
+       0.000000   0.000000   0.000000   1.000000
+
+scan_0080_1sweep_0
+      -0.027025   0.999358   0.023507   2.799538
+      -0.997199  -0.028593   0.069119   4.898078
+       0.069747  -0.021573   0.997331   0.008594
+       0.000000   0.000000   0.000000   1.000000
+
+scan_0082_1sweep_0
+       0.032524  -0.999471   0.000000   2.821312
+       0.999471   0.032524   0.000000  -5.563076
+       0.000000   0.000000   1.000000   0.000000
+       0.000000   0.000000   0.000000   1.000000
+
+scan_0081_1sweep_0
+      -0.999411  -0.034306   0.000000   3.450892
+       0.034306  -0.999411   0.000000   1.491644
+       0.000000   0.000000   1.000000   0.000000
+       0.000000   0.000000   0.000000   1.000000

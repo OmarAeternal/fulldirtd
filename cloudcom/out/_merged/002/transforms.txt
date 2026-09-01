@@ -1,0 +1,50 @@
+# clomerged — penggabungan sadar fitur
+# Jangkauan dipotong : 10.0 m
+# Sapuan sudut       : tiap 2.0°, 14 puncak teratas
+# Penilaian tajam    : titik menonjol (>0.04 m dari bidang besar), toleransi 0.03 m
+# Pelepasan geseran  : ±1.5 m bila rasio arah lemah < 0.08
+#
+# tajam   = bagian titik MENONJOL yang mendarat tepat di permukaan acuan.
+#           Inilah yang menentukan vonis. Huruf/tiang yang meleset langsung
+#           terhukum karena toleransinya cuma 0.03 m.
+# longgar = takaran lama (10 cm, semua permukaan). Dicantumkan hanya supaya
+#           sebanding dengan run outmerge terdahulu — TIDAK memutuskan apa pun.
+#           longgar tinggi + tajam rendah = menempel di tembok, salah tempat.
+# lemah   = arah gerak yang paling tidak terkunci geometri, dan rasionya.
+#           Rasio kecil berarti hasil bisa tergelincir ke arah itu tanpa
+#           menaikkan galat — di situlah 'FILFILKOM' lahir.
+# unslide = berapa meter hasil digeser sepanjang arah lemah itu untuk
+#           membetulkannya.
+
+# Ringkasan:
+#   scan_0073_1sweep_0.ply                   tajam 0.0986  longgar 0.3564  rmse 0.0210 m  margin +0.0542  GAGAL   [ke scan_0075_1sweep_0.ply]
+#   scan_0075_1sweep_0.ply                   tajam —  longgar —  rmse — m  margin —  BAIK   [ke —]
+
+# Arah terlemah dan koreksi geseran:
+#   scan_0073_1sweep_0.ply                   geser tegak (+0.46, +0.23, -0.86) rasio 0.0645   → digeser +0.000 m
+#   scan_0075_1sweep_0.ply                   tak terhitung   → tidak perlu disapu
+
+# Perataan tanah tiap scan (sudah termasuk di matriks gabungan):
+#   scan_0073_1sweep_0.ply                   18.91° dikoreksi
+#   scan_0075_1sweep_0.ply                   16.93° dikoreksi
+
+# Matriks gabungan tiap scan ke kerangka acuan.
+# Sudah termasuk perataan tanah; pakai langsung pada scan asli.
+
+scan_0073_1sweep_0.ply
+  status  : GAGAL
+  yaw     : 180.422°
+  matriks :
+    -0.904708   0.009828   0.425920   3.541281
+    -0.006666  -0.999938   0.008914   1.698320
+     0.425981   0.005225   0.904717   1.303417
+     0.000000   0.000000   0.000000   1.000000
+
+scan_0075_1sweep_0.ply
+  status  : BAIK
+  yaw     : 359.539°
+  matriks :
+     0.979050  -0.005348  -0.203548   0.107857
+    -0.007871   0.997914  -0.064079   0.017321
+     0.203466   0.064339   0.976966   1.340515
+     0.000000   0.000000   0.000000   1.000000

@@ -13,9 +13,9 @@ Hasil selalu masuk ke ~/riset td/cloudcom/out/, di mana pun kamu berada.
 Mau pindah? Set env var, tanpa mengubah kode:
     export CLOUDCOM_OUT="~/tempat/lain"
 
-clomcap, clomcaps, clomerge, clomergeout, outmerge, dan clocom sudah jadi
-perintah, jalan dari mana saja. Untuk skrip yang belum (bagian 7 dan 8 di
-bawah), ketik sekali per terminal:
+clomcap, clomcaps, clomerge, clomergeout, outmerge, clomerged, dan clocom
+sudah jadi perintah, jalan dari mana saja. Untuk skrip yang belum (bagian 8
+dan 9 di bawah), ketik sekali per terminal:
     CC="$HOME/riset td/ros2_ws/cloudcom"
 
 
@@ -245,7 +245,82 @@ untuk membandingkan --range 6 vs --range 8.
 4 scan @ ~450 ribu titik ≈ 2,5 menit.
 
 
-6. clocom  —  buka CloudCompare biasa
+6. clomerged  —  sadar fitur, untuk tempat bertembok polos
+-----------------------------------------------------------
+Pakai ini kalau hasil outmerge/clomerge "menempel rapi ke tembok tapi salah
+tempat": tulisan di dinding jadi dobel dan bergeser, FILKOM terbaca FILFILKOM.
+
+    clomerged scan_0072_1sweep_0.mcap scan_0073_1sweep_0.mcap \
+              scan_0074_1sweep_0.mcap scan_0075_1sweep_0.mcap
+
+KENAPA YANG LAMA GAGAL DI SITU
+Satu bidang cuma mengunci 3 dari 6 derajat kebebasan. Tembok + tanah mengunci
+5. Yang tersisa satu: GESERAN MENYUSURI TEMBOK. Yang bisa mengunci sisa satu
+itu cuma ciri kecil — huruf timbul, tiang, kusen — dan justru itu yang kalah
+suara melawan tembok.
+
+Diukur pada scan_0072-0075: satu scan dinilai melawan DIRINYA SENDIRI, digeser
+menyusuri tembok, fitness-nya masih 0,54 pada geseran 0,5 m dan 0,48 pada 1 m —
+padahal ambang "BAIK" cuma 0,30. Sebabnya toleransi penilaian 10 cm sedangkan
+jarak antar titik cuma 3-4 cm: pada permukaan serapat itu tiap titik pasti
+menemukan pasangan di mana pun ia ditaruh. Yang terukur bukan "apakah aku di
+tempat yang benar", tapi cuma "apakah aku menempel di suatu permukaan".
+
+APA YANG BEDA
+  1. PENILAIAN TAJAM. Dinilai hanya pada titik MENONJOL — yang tidak terletak
+     di bidang latar mana pun — dengan toleransi 3 cm, bukan 10 cm. Huruf
+     timbul 5-15 cm: begitu digeser, mukanya mendarat di tembok polos dan
+     langsung jadi pencilan.
+     Bidang latar dipilih menurut LUAS terisi, bukan jumlah titik — muka semua
+     huruf terletak pada satu bidang yang sama dan kalau dihitung dari jumlah
+     titik saja, hurufnya sendiri ikut terbuang.
+  2. CUPLIKAN BERIMBANG PER ARAH NORMAL. ICP point-to-plane tidak punya
+     gradien sama sekali menyusuri sebuah bidang. Yang punya justru sisi-samping
+     huruf dan kusen — sedikit, jadi biasanya tenggelam. Di sini titik sumber
+     dicuplik berimbang per arah normal supaya mereka bersuara setara tembok.
+  3. PELEPASAN GESERAN (unslide). Arah paling lemah dihitung dari Hessian ICP.
+     Kalau memang nyaris tak terkunci, arah itu disapu satu dimensi dengan
+     penilaian tajam, lalu puncaknya dipakai jadi titik awal ICP ulang. Pose
+     semula tetap ikut dilombakan, jadi yang sudah benar tidak akan dirusak.
+
+MEMBACA transforms.txt
+    tajam    yang menentukan vonis. Bagian titik menonjol yang mendarat tepat.
+    longgar  takaran lama (10 cm). Ada hanya supaya sebanding dengan run
+             outmerge terdahulu — tidak memutuskan apa pun.
+             longgar tinggi + tajam rendah = menempel di tembok, salah tempat.
+    lemah    arah paling tidak terkunci + rasionya. Rasio kecil = di situlah
+             FILFILKOM lahir.
+    unslide  berapa meter hasilnya digeser untuk membetulkannya.
+
+Pilihan tambahan:
+    --sharp 0.02       toleransi penilaian tajam (default 0.03). Perkecil kalau
+                       tulisan masih dobel; perbesar kalau semua divonis GAGAL
+                       padahal hasilnya terlihat benar.
+                       DIUKUR pada scan_0072-0075: 0.03 memberi tajam 0,25-0,48;
+                       0.02 membuat SEMUANYA GAGAL (0,04-0,11). Jadi 0.02 sudah
+                       di bawah derau sampling sensor ini — dua scan tidak
+                       pernah mengenai titik yang sama serapat itu. Jangan
+                       turun di bawah 0.03 untuk data dari rig ini.
+    --salient-tol 0.03 seberapa jauh dari bidang latar baru dianggap ciri
+                       (default 0.04). Perkecil kalau cirinya tipis — tulisan
+                       cat atau ukiran dangkal.
+    --slide-range 2.5  sapuan pelepasan geseran ±meter (default 1.5)
+    --weak-ratio 0.15  ambang sebuah arah dianggap lemah (default 0.08).
+                       Perbesar supaya lebih sering menyapu.
+    --no-unslide       matikan pelepasan geseran, untuk membandingkan
+    --range --step-deg --seeds --rounds     sama seperti outmerge
+    -t  --force  --png  --no-grid  --spacing  --margin  --no-open
+
+Hasil di out/_merged/001/, 002/, dst. Isinya sama seperti outmerge.
+
+KALAU MASIH DOBEL JUGA
+Ciri tempat itu memang tidak cukup. Urutan yang biasanya menolong:
+    clomerged *.mcap --sharp 0.02 --slide-range 2.5 --weak-ratio 0.2
+    lalu --range lebih besar supaya lebih banyak ciri ikut terlihat
+    kalau tetap: taruh benda asimetris di lokasi sebelum scan ulang
+
+
+7. clocom  —  buka CloudCompare biasa
 --------------------------------------
     clocom                                    buka kosong
     clocom out/scan_0007_1sweep_0/*.ply       buka hasil satu scan
@@ -254,7 +329,7 @@ untuk membandingkan --range 6 vs --range 8.
 Terlepas dari terminal — terminal boleh ditutup, CloudCompare tetap jalan.
 
 
-7. mcaptopc_cli.py  —  mcap → PLY + XYZ + PNG (tanpa buka CloudCompare)
+8. mcaptopc_cli.py  —  mcap → PLY + XYZ + PNG (tanpa buka CloudCompare)
 -----------------------------------------------------------------------
 Pakai ini kalau butuh file .xyz atau PNG-nya, bukan mau langsung melihat.
 
@@ -270,7 +345,7 @@ Pilihan tambahan:
     -t /map_3d              paksa topik tertentu
 
 
-8. make_grid.py  —  buat grid sendiri
+9. make_grid.py  —  buat grid sendiri
 --------------------------------------
 Biasanya tidak perlu (clomcap sudah otomatis). Kalau mau grid manual:
 
