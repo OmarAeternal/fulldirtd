@@ -1,0 +1,30 @@
+# Dependensi cloudcom
+# ───────────────────
+# Pasang di venv sendiri, terpisah dari pointcloud_studio (yang menahan
+# numpy<2, sedangkan cloudcom justru berjalan di numpy 2.x):
+#
+#     python3.12 -m venv .venv
+#     .venv/bin/python -m pip install -r requirements.txt
+#
+# PENTING — harus Python 3.12, bukan 3.13.
+# Open3D 0.19.0 adalah rilis terbaru dan belum menyediakan wheel untuk
+# Python 3.13. Fedora 41+ memakai 3.13 sebagai bawaan, jadi di sana Python
+# 3.12 perlu dipasang terpisah (lihat SETUP.md).
+#
+# Versi dikunci persis seperti yang dipakai saat hasil penelitian ini dibuat,
+# supaya angka yang keluar di komputermu sama dengan yang tercatat.
+
+numpy==2.5.1
+scipy==1.18.0
+matplotlib==3.11.1
+
+# Pembacaan berkas rekaman .mcap — tidak butuh ROS 2 terpasang.
+mcap==1.4.0
+mcap-ros2-support==0.5.7
+
+# Dipakai clomerge.py dan pasak.py untuk ICP. Diimpor saat dibutuhkan saja,
+# jadi skrip lain tetap jalan walau Open3D belum terpasang.
+open3d==0.19.0
+
+# Untuk menjalankan tes.
+pytest==9.1.1
