@@ -6,7 +6,7 @@
 
 import * as THREE from 'three';
 import { toast, setHint } from './hud.js';
-import { renderer, vp, scene, kamera, onFrame } from './viewer.js';
+import { renderer, vp, scene, kamera, onFrame, onLatarGanti } from './viewer.js';
 import * as layers from './layers.js';
 import * as grid from './grid.js';
 
@@ -33,6 +33,10 @@ const raycaster = new THREE.Raycaster();
 const matJarak = new THREE.LineBasicMaterial({ color: WARNA_JARAK });
 const matSudut = new THREE.LineBasicMaterial({ color: WARNA_SUDUT });
 const matSorot = new THREE.LineBasicMaterial({ color: 0xffffff });
+onLatarGanti((terang) => {
+  matSorot.color.set(terang ? 0x000000 : 0xffffff);
+  matPratinjau.color.set(terang ? 0x3c4655 : WARNA_PRATINJAU);
+});
 const matPratinjau = new THREE.LineDashedMaterial({ color: WARNA_PRATINJAU,
   dashSize: 0.08, gapSize: 0.05, transparent: true, opacity: 0.85 });
 

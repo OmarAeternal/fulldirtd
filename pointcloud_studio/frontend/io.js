@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { toast, setHint } from './hud.js';
 import { scene, matMesh, frameCamera } from './viewer.js';
 import * as layers from './layers.js';
+import * as ratakan from './ratakan.js';
 
 let meshObj = null;
 let meshDirty = true;
@@ -50,13 +51,17 @@ async function terimaTitik(res, label) {
 
   // Kamera hanya di-frame saat layer pertama masuk. Layer berikutnya tidak
   // menggeser pandangan — kamera meloncat di tengah pengukuran itu menyebalkan.
+  // Diratakan sebelum masuk daftar, bukan sesudahnya: layer tidak sempat
+  // tampil miring, dan kamera langsung di-frame ke bentuk akhirnya.
+  const siap = await ratakan.siapkan(cloud);
   const pertama = layers.daftar().length === 0;
-  layers.tambah({ nama: label, cloud, ket });
+  layers.tambah({ nama: label, cloud: siap.cloud, ket, rata: siap.rata });
   if (pertama) frameCamera();
 
   meshDirty = true;
   if (layers.modeTampilan() === 'mesh') await bangunMesh();
-  toast(`Dimuat: ${stats.n.toLocaleString('id')} titik — ${label}`);
+  toast(`Dimuat: ${stats.n.toLocaleString('id')} titik — ${label}` +
+        ratakan.keterangan(siap.rata));
 }
 
 export async function muatBerkas(file) {

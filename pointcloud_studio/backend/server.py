@@ -26,6 +26,7 @@ import loader
 import mesh as meshmod
 import analysis as analysismod
 import downsample
+import tanah as tanahmod
 
 FRONTEND = pathlib.Path(__file__).parent.parent / "frontend"
 
@@ -177,6 +178,20 @@ async def analyze(request: Request):
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Analisis gagal: {e}")
     return JSONResponse(result)
+
+
+@app.post("/tanah")
+async def cari_tanah(request: Request):
+    """Body: Float32 [x,y,z]*N satu layer. → matriks perataan tanah.
+
+    Tidak menemukan tanah bukan galat — layernya cukup dibiarkan apa adanya —
+    jadi balasannya tetap 200 dengan `ditemukan: false`.
+    """
+    pts = await _read_points(request)
+    hasil = tanahmod.cari_tanah(pts)
+    if hasil is None:
+        return JSONResponse({"ditemukan": False})
+    return JSONResponse({"ditemukan": True, **hasil})
 
 
 @app.get("/")

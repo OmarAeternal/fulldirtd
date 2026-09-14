@@ -73,12 +73,13 @@ export function modeTampilan() { return _mode; }
 // ============================================================
 // CRUD
 // ============================================================
-export function tambah({ nama, cloud, ket = '' }) {
+export function tambah({ nama, cloud, ket = '', rata = null }) {
   const L = {
     id: ++_urutan,
     nama,
     cloud,
     ket,
+    rata,                     // state perataan tanah, milik ratakan.js
     terlihat: true,
     bounds: hitungBounds(cloud),
     undo: [],
@@ -126,6 +127,21 @@ export function setTerlihat(id, on) {
   beritahu();
 }
 
+/** Warna TAMPILAN layer (Float32 [r,g,b]*N), atau null untuk warna berkas.
+ *  Hanya atribut geometry yang ditimpa; `cloud` — yang diekspor — tetap. */
+export function tulisWarna(id, rgb) {
+  const L = _cari(id);
+  if (!L) return;
+  const attr = L.points.geometry.getAttribute('color');
+  if (rgb) attr.array.set(rgb);
+  else for (let i = 0, n = L.cloud.length / 6; i < n; i++) {
+    attr.array[i * 3] = L.cloud[i * 6 + 3];
+    attr.array[i * 3 + 1] = L.cloud[i * 6 + 4];
+    attr.array[i * 3 + 2] = L.cloud[i * 6 + 5];
+  }
+  attr.needsUpdate = true;
+}
+
 /** Satu-satunya jalan mengubah titik sebuah layer. */
 export function gantiCloud(id, cloudBaru, { simpanUndo = true } = {}) {
   const L = _cari(id);
@@ -139,6 +155,32 @@ export function gantiCloud(id, cloudBaru, { simpanUndo = true } = {}) {
   L.points.geometry.dispose();
   L.points.geometry = bangunGeometry(cloudBaru);
   beritahu();
+}
+
+/** Ubah titik tanpa membuat entri undo — untuk transformasi yang berlaku ke
+ *  seluruh sejarah layer (perataan tanah). Tumpukan undo ikut dipetakan;
+ *  kalau tidak, undo sesudah meratakan akan memunculkan titik yang masih
+ *  miring. */
+export function petakanCloud(id, fn) {
+  const L = _cari(id);
+  if (!L) return;
+  L.undo = L.undo.map(fn);
+  gantiCloud(id, fn(L.cloud), { simpanUndo: false });
+}
+
+/** Maju (+1) atau mundur (−1) ke layer berikutnya, berputar di ujung.
+ *  Layer tujuan jadi aktif dan satu-satunya yang terlihat — melangkah sambil
+ *  semua tetap tampil tidak mengubah apa pun di layar. → layer tujuan. */
+export function langkah(arah) {
+  const n = _layers.length;
+  if (n < 2) return null;
+  const i = _layers.findIndex(L => L.id === _aktifId);
+  const j = i < 0 ? (arah > 0 ? 0 : n - 1) : ((i + arah) % n + n) % n;
+  _aktifId = _layers[j].id;
+  for (const L of _layers) L.terlihat = L.id === _aktifId;
+  terapkanTampilan();
+  beritahu();
+  return _layers[j];
 }
 
 export function undoLayer(id) {

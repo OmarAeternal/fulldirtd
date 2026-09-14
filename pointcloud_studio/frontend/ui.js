@@ -10,6 +10,8 @@ import * as edit from './edit.js';
 import * as measure from './measure.js';
 import * as grid from './grid.js';
 import * as io from './io.js';
+import * as ratakan from './ratakan.js';
+import * as panelView from './panelview.js';
 
 const el = (id) => document.getElementById(id);
 const setBtn = (id, on) => el(id).classList.toggle('on', on);
@@ -44,6 +46,60 @@ function renderPanelLayer() {
     row.querySelector('.nm').onclick = () => layers.setAktif(L.id);
     row.querySelector('.x').onclick = () => layers.tutup(L.id);
     box.appendChild(row);
+  }
+}
+
+// ============================================================
+// Maju / mundur layer
+// ============================================================
+// Tombol hanya ada bila layernya lebih dari satu; dengan satu layer tidak ada
+// tempat untuk melangkah.
+function renderNav() {
+  const daftar = layers.daftar();
+  const ada = daftar.length > 1;
+  for (const id of ['navPrev', 'navNext', 'navLabel']) el(id).classList.toggle('hide', !ada);
+  if (!ada) return;
+  const L = layers.aktif();
+  const i = daftar.findIndex(x => x.id === L?.id);
+  const lain = layers.terlihat().filter(x => x.id !== L?.id).length;
+  el('navLabel').textContent = L
+    ? `${i + 1} / ${daftar.length} · ${L.nama}` + (lain ? ` (+${lain} terlihat)` : '')
+    : `– / ${daftar.length}`;
+}
+
+function melangkah(arah) {
+  if (!layers.langkah(arah)) return;
+  if (layers.modeTampilan() === 'mesh') io.bangunMesh();
+}
+
+// ============================================================
+// Ratakan tanah
+// ============================================================
+function renderTombolRata() {
+  const b = el('tRata');
+  setBtn('tRata', ratakan.aktifkah());
+  b.disabled = ratakan.sibukkah();
+  b.textContent = ratakan.sibukkah() ? '⊥ Meratakan…' : '⊥ Ratakan';
+}
+
+async function tukarRata() {
+  const on = !ratakan.aktifkah();
+  const hasil = await ratakan.setAktif(on);
+  if (!hasil) return;
+  if (!layers.daftar().length) {
+    toast(on ? 'Ratakan menyala — berkas yang dibuka akan diratakan'
+             : 'Ratakan mati — berkas dibuka apa adanya');
+    return;
+  }
+  let pesan = on ? `Tanah diratakan: ${hasil.jumlah} layer`
+                 : `Perataan dimatikan: ${hasil.jumlah} layer dikembalikan`;
+  if (hasil.tanpa) pesan += ` · ${hasil.tanpa} tanpa tanah`;
+  // Ukuran dan grid menyimpan koordinat dunia; mereka tidak ikut berputar.
+  if (hasil.jumlah && measure.daftarHasil().length) pesan += ' · ukuran lama tidak ikut bergeser';
+  toast(pesan);
+  if (hasil.jumlah) {
+    if (layers.boundsGabungan()) frameCamera();
+    if (layers.modeTampilan() === 'mesh') io.bangunMesh();
   }
 }
 
@@ -262,9 +318,11 @@ export function init() {
   edit.pasangPenangan();
   measure.pasangPenangan();
   grid.pasangPenangan();
+  panelView.init();
 
   layers.onUbah(() => {
     renderPanelLayer();
+    renderNav();
     updateStats();
     applySlice();
     el('drop').classList.toggle('hide', layers.daftar().length > 0);
@@ -286,6 +344,10 @@ export function init() {
   el('tSelect').onclick = () => setSel(!edit.selMode());
   el('tMeasure').onclick = () => setMeasure(!measure.measureMode());
   el('btnUndo').onclick = edit.undo;
+  el('tRata').onclick = tukarRata;
+  ratakan.onUbah(renderTombolRata);
+  el('navPrev').onclick = () => melangkah(-1);
+  el('navNext').onclick = () => melangkah(+1);
 
   el('vTop').onclick = () => setView('top');
   el('vFront').onclick = () => setView('front');
@@ -370,6 +432,8 @@ export function init() {
   });
 
   renderPanelLayer();
+  renderNav();
+  renderTombolRata();
   updateStats();
   applySlice();
   renderPanelGrid();

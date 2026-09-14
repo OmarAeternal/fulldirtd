@@ -54,14 +54,64 @@ Saat pertama kali, `run.sh` otomatis membuat virtualenv dan memasang dependensi
 1. **Tarik file** `.ply` / `.xyz` ke jendela (atau klik "Buka"). Boleh beberapa sekaligus —
    tiap berkas jadi satu **layer**, dan membuka berkas baru tidak pernah menimpa yang lama.
 2. **Panel Layer** → ◉ sembunyi/tampil · klik nama untuk menjadikannya **aktif** · ✕ tutup.
-3. **Mode tampilan**: Titik · Padat · Mesh (permukaan).
-4. **Pilih area** ▭ → tarik kotak → hapus atap/lantai/noise (atau "Simpan di dalam" untuk crop).
-5. **Grid** ▦ → bidang acuan yang bisa digeser & diputar (lihat di bawah).
-6. **Ukur** 📏 → klik menancapkan ujung, garis mengikuti kursor dengan angka hidup,
+   Bila layer lebih dari satu, tombol **‹ ›** muncul di tepi kiri/kanan viewport: melangkah
+   ke layer sebelumnya/berikutnya (berputar di ujung) dan hanya menampilkan layer itu.
+3. **⊥ Ratakan** (panel atas, **menyala bawaan**) → tanah tiap layer diputar jadi datar di
+   z = 0 (lihat di bawah).
+4. **Mode tampilan**: Titik · Padat · Mesh (permukaan).
+5. **Pilih area** ▭ → tarik kotak → hapus atap/lantai/noise (atau "Simpan di dalam" untuk crop).
+6. **Grid** ▦ → bidang acuan yang bisa digeser & diputar (lihat di bawah).
+7. **Ukur** 📏 → klik menancapkan ujung, garis mengikuti kursor dengan angka hidup,
    klik lagi mengunci. Hasilnya menetap dan bisa diekspor ke CSV.
-7. **Irisan Z** → slider untuk menyembunyikan atap/lantai (lihat denah).
-8. **Analisis dimensi** → RANSAC deteksi dinding/lantai → tinggi, RMSE planaritas, ortogonalitas.
-9. **Ekspor** → simpan hasil editan ke PLY/XYZ baru (file asli tak tersentuh).
+8. **Irisan Z** → slider untuk menyembunyikan atap/lantai (lihat denah).
+9. **Analisis dimensi** → RANSAC deteksi dinding/lantai → tinggi, RMSE planaritas, ortogonalitas.
+10. **Ekspor** → simpan hasil editan ke PLY/XYZ baru (file asli tak tersentuh).
+
+## Ratakan tanah
+
+Tiap berkas yang dibuka langsung diratakan: backend (`/tanah`) mencari bidang tanah, lalu
+layer diputar supaya bidang itu datar dan digeser supaya tanah ada di z = 0. Toast "Dimuat"
+menyebut berapa derajat kemiringan yang dikoreksi. Tombol **⊥ Ratakan** mematikan/menyalakan
+lagi untuk semua layer; mematikan memutar balik dengan matriks yang sama, jadi bolak-balik
+tidak menggeser apa pun, dan riwayat undo ikut dipetakan.
+
+- **Hanya tanah yang dilihat** — dibuat untuk lapangan terbuka yang rata, tanpa tembok.
+  Bidang yang lebih tegak dari 50° tidak dianggap tanah.
+- **Dihitung per luas, bukan per titik** (kubus 10 cm), supaya gumpalan padat di dekat
+  sensor tidak mengalahkan tanah yang lebar.
+- **Deterministik** — RANSAC dengan benih tetap, dihaluskan lewat SVD; berkas yang sama
+  selalu diratakan persis sama.
+- **Putaran terkecil** — arah hadap scan dilihat dari atas tidak berubah.
+- **Warna ketinggian dihitung ulang.** PLY dari `mcaptopc` diwarnai viridis menurut Z;
+  tanpa ini, tanah yang sudah datar tetap tampak bergradasi. Warna jenis lain tak disentuh.
+- Bila tanah tidak meyakinkan (kurang dari 12% luas menempel di satu bidang), layer dibuka
+  apa adanya dan toast mengatakannya.
+
+Ukuran dan grid menyimpan koordinat dunia, jadi tidak ikut berputar saat tombol ditekan.
+
+## Tab View — warna & ukuran titik
+
+Panel kanan punya dua tab: **Alat** (semua panel lama) dan **View**. Pengaturan View hanya
+mengubah tampilan — ekspor PLY/XYZ tetap membawa warna berkas — dan diingat browser.
+
+| Isian | Pilihan |
+|---|---|
+| **Warna** | Ketinggian (Z) · Jarak dari sensor · Per layer · Satu warna · Warna berkas (asli) |
+| **Palet** | Viridis · Turbo (paling kontras) · Inferno · Cividis (ramah buta warna) · Biru–Merah · Abu-abu |
+| **Sebaran** | Persentil 2–98% (bawaan) · Linear min–maks · Kuantil (tiap warna menutupi luas yang sama) · Rentang manual |
+| **Tingkat warna** | halus, atau 2–16 pita bertingkat supaya nilai mudah dibaca dari legenda |
+| **Ukuran titik** | skala 1× (normal) sampai 5× |
+| **Latar belakang** | Gelap (bawaan) · Hitam · Abu-abu · Terang · Putih, atau warna bebas lewat pemilih warna |
+
+**Legenda** di pojok kanan bawah viewport menyebut besaran, satuan, dan nilai. Label ≤/≥ di
+ujung berarti titik di luar rentang ikut diberi warna ujung. Skala dihitung dari layer yang
+**terlihat**, jadi legenda selalu cocok dengan layar, termasuk saat melangkah dengan ‹ ›.
+Bila semua layer terlihat sudah diratakan, judulnya "Tinggi dari tanah".
+
+Persentil dan kuantil dihitung **per luas** (kubus 10 cm), bukan per titik: badan drone yang
+ikut terscan menumpuk ribuan titik dekat sensor, dan dihitung per titik skalanya tertarik
+ke ketinggian drone. Untuk membandingkan beberapa scan dengan skala yang sama, pakai
+**Rentang manual** — isiannya dimulai dari rentang yang sedang tampil.
 
 ## Grid referensi & pengukuran
 
@@ -101,6 +151,8 @@ dan baris di panel; menggantung kursor di barisnya menyorotnya, ✕ menghapusnya
 | Hapus/crop area · Undo · Ekspor | layer **aktif** saja |
 | Statistik · Mesh · Analisis RANSAC | **gabungan** semua layer yang terlihat |
 | Irisan Z · mode tampilan | seluruh scene |
+| Ratakan | **tiap layer** terhadap tanahnya sendiri |
+| Warna tampilan (skala & legenda) | **gabungan** semua layer yang terlihat |
 
 Menghapus titik itu merusak, jadi sasarannya tunggal dan jelas. Analisis tidak merusak
 dan justru berguna melintasi beberapa sweep dari ruangan yang sama, jadi memakai gabungan.
@@ -121,11 +173,12 @@ pointcloud_studio/
 ├── run.sh                 launcher tanpa argumen berkas
 ├── requirements.txt
 ├── backend/
-│   ├── server.py          FastAPI (load, open, mesh, analyze)
+│   ├── server.py          FastAPI (load, open, mesh, analyze, tanah)
 │   ├── loader.py          parser PLY/XYZ
 │   ├── downsample.py      optimasi kerapatan berbasis voxel
 │   ├── mesh.py            meshing berbasis-sudut
-│   └── analysis.py        RANSAC dimensi (Open3D)
+│   ├── analysis.py        RANSAC dimensi (Open3D)
+│   └── tanah.py           cari bidang tanah → matriks perataan
 ├── frontend/
 │   ├── index.html
 │   ├── app.js             bootstrap: seret-lepas, ?file=…
@@ -134,7 +187,11 @@ pointcloud_studio/
 │   ├── edit.js            box-select hapus/crop + undo
 │   ├── grid.js            grid referensi + gizmo transform
 │   ├── measure.js         alat ukur jarak/sudut + CSV
-│   ├── layers.js          daftar layer (sumber kebenaran titik)
+│   ├── layers.js          daftar layer (sumber kebenaran titik) + maju/mundur
+│   ├── ratakan.js         tombol Ratakan: terapkan matriks tanah + warna ulang
+│   ├── warna.js           pewarnaan tampilan, skala, legenda, ukuran titik
+│   ├── panelview.js       tab Alat | View dan isian tab View
+│   ├── palet.js           jangkar palet warna (matplotlib)
 │   ├── viewer.js          panggung Three.js: kamera, kontrol, material
 │   ├── hud.js             toast + baris keterangan
 │   └── vendor/            Three.js (offline)

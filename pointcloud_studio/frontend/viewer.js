@@ -16,6 +16,18 @@ vp.appendChild(renderer.domElement);
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0e1116);
 
+// Latar bisa diganti dari tab View. Pendengar diberi tahu apakah latarnya
+// terang, supaya garis yang sengaja dibuat pucat (pratinjau ukur, sorotan)
+// bisa berganti gelap dan tidak lenyap di latar putih.
+const pendengarLatar = [];
+export function onLatarGanti(fn) { pendengarLatar.push(fn); }
+export function setLatar(hex) {
+  scene.background.set(hex);
+  const { r, g, b } = scene.background;
+  const terang = 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5;
+  pendengarLatar.forEach(f => f(terang));
+}
+
 // Data LiDAR memakai Z sebagai sumbu vertikal → set 'up' = Z agar orbit terasa natural.
 export const UP = new THREE.Vector3(0, 0, 1);
 const persp = new THREE.PerspectiveCamera(60, 1, 0.01, 5000);
@@ -57,7 +69,10 @@ function gizmoLabel(txt, color, pos) {
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d');
   g.font = 'bold 46px sans-serif'; g.fillStyle = color;
-  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 32, 34);
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  // Tepi gelap: hurufnya pastel, dan tanpa tepi lenyap di latar putih.
+  g.lineWidth = 7; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(txt, 32, 34);
+  g.fillText(txt, 32, 34);
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({
     map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
   sp.position.copy(pos); sp.scale.setScalar(0.55);
@@ -108,6 +123,13 @@ export const matPoints = new THREE.PointsMaterial({ size: 0.02, vertexColors: tr
 export const matDense = new THREE.PointsMaterial({ size: 0.12, vertexColors: true,
   sizeAttenuation: true, map: sprite, alphaTest: 0.5, transparent: false,
   clippingPlanes: clipPlanes });
+// Ukuran bawaan di atas adalah 1×; slider View mengalikannya sampai 5×.
+const UKURAN_DASAR = { points: matPoints.size, dense: matDense.size };
+export function setSkalaTitik(k) {
+  matPoints.size = UKURAN_DASAR.points * k;
+  matDense.size = UKURAN_DASAR.dense * k;
+}
+
 export const matMesh = new THREE.MeshStandardMaterial({ color: 0x8fa6c4,
   roughness: 0.85, metalness: 0.0, side: THREE.DoubleSide, flatShading: true,
   vertexColors: true, clippingPlanes: clipPlanes });

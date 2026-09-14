@@ -31,8 +31,8 @@
   #viewport canvas { display:block; }
   #selbox { position:absolute; border:1.5px dashed var(--accent); background:rgba(76,141,255,.12);
     pointer-events:none; display:none; z-index:5; }
-  #hint { position:absolute; left:12px; bottom:12px; font-size:12px; color:var(--dim);
-    background:rgba(0,0,0,.45); padding:5px 9px; border-radius:6px; z-index:4; pointer-events:none;}
+  #hint { position:absolute; left:12px; bottom:12px; font-size:12px; color:#c3cbd6;
+    background:rgba(14,17,22,.82); padding:5px 9px; border-radius:6px; z-index:4; pointer-events:none;}
   #drop { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     flex-direction:column; gap:14px; z-index:6; background:rgba(14,17,22,.85); text-align:center; }
   #drop.hide { display:none; }
@@ -61,6 +61,47 @@
     font-size:13px; z-index:10; display:none; box-shadow:0 6px 24px rgba(0,0,0,.4); }
   #toast.err { border-color:var(--danger); color:#ffb4b4; }
   input[type=file] { display:none; }
+  /* Maju/mundur layer — melayang di tepi viewport */
+  .nav { position:absolute; top:50%; transform:translateY(-50%); z-index:4;
+    width:42px; height:76px; border-radius:8px; border:1px solid var(--line);
+    background:rgba(23,27,34,.78); color:var(--txt); font-size:30px; line-height:1;
+    cursor:pointer; padding:0; }
+  .nav:hover { border-color:var(--accent); background:rgba(76,141,255,.28); }
+  #navPrev { left:10px; }
+  #navNext { right:10px; }
+  #navLabel { position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:4;
+    font-size:12px; background:rgba(14,17,22,.82); padding:4px 10px; border-radius:6px;
+    pointer-events:none; max-width:70%; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .nav.hide, #navLabel.hide { display:none; }
+  /* Legenda warna — pojok kanan bawah viewport */
+  #legenda { position:absolute; right:12px; bottom:12px; z-index:4; width:280px;
+    background:rgba(14,17,22,.82); border:1px solid var(--line); border-radius:8px;
+    padding:8px 12px 6px; font-size:12px; pointer-events:none; }
+  #legenda.hide { display:none; }
+  #legenda canvas { width:100%; height:14px; display:block; border-radius:3px; }
+  .lg-judul { font-weight:600; margin-bottom:5px; color:#fff; }
+  .lg-cat { font-weight:400; color:var(--dim); font-size:11px; }
+  .lg-tik { position:relative; height:16px; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .lg-tik span { position:absolute; top:0; white-space:nowrap; }
+  .lg-baris { display:flex; align-items:center; gap:7px; padding:1px 0; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .lg-kotak { width:12px; height:12px; border-radius:3px; flex:none; }
+  /* Tab panel kanan */
+  .tabs { display:flex; gap:4px; position:sticky; top:-12px; z-index:3; background:var(--panel);
+    margin:-12px -12px 12px; padding:10px 12px 0; border-bottom:1px solid var(--line); }
+  .tabs .tab-btn { flex:1; background:none; border:none; border-bottom:2px solid transparent;
+    color:var(--dim); font-size:12.5px; font-weight:600; padding:6px 0 8px; cursor:pointer;
+    letter-spacing:.3px; }
+  .tabs .tab-btn:hover { color:var(--txt); }
+  .tabs .tab-btn.on { color:#fff; border-bottom-color:var(--accent); }
+  .tab.hide { display:none; }
+  [data-untuk].hide { display:none !important; }
+  .latar-pilih { display:flex; gap:6px; margin:4px 0 2px; }
+  .latar-pilih button { flex:1; height:34px; border-radius:6px; cursor:pointer; padding:0;
+    border:1px solid var(--line); font-size:10px; }
+  .latar-pilih button.on { outline:2px solid var(--accent); outline-offset:1px; }
+  #vPratinjau { width:100%; height:14px; display:block; border-radius:3px; margin:2px 0 6px; }
   .small { font-size:11px; color:var(--dim); }
   .lyr { display:flex; align-items:center; gap:6px; font-size:12px; padding:3px 0;
     border-bottom:1px solid var(--line); }
@@ -120,6 +161,9 @@
     <button class="btn" id="tMeasure" title="Klik untuk menancapkan ujung, klik lagi untuk mengunci">📏 Ukur</button>
     <button class="btn" id="tGrid" title="Grid referensi yang bisa digeser & diputar">▦ Grid</button>
     <div class="sep"></div>
+    <button class="btn on" id="tRata"
+      title="Putar tiap layer supaya tanahnya datar di z = 0. Menyala otomatis tiap membuka berkas.">⊥ Ratakan</button>
+    <div class="sep"></div>
     <button class="btn" id="btnUndo" title="Batalkan hapus terakhir">↶ Undo</button>
     <div class="sep"></div>
     <div class="grp" title="Sudut pandang">
@@ -133,6 +177,10 @@
   <div id="viewport">
     <div id="selbox"></div>
     <div id="hint"></div>
+    <button class="nav hide" id="navPrev" title="Layer sebelumnya">‹</button>
+    <button class="nav hide" id="navNext" title="Layer berikutnya">›</button>
+    <div id="navLabel" class="hide"></div>
+    <div id="legenda" class="hide"></div>
     <div id="drop">
       <div class="big">Tarik file <b>.ply</b> / <b>.xyz</b> ke sini</div>
       <div class="dim">atau klik "Buka" di atas. Semua diproses lokal di laptopmu — tidak diunggah ke mana pun.</div>
@@ -142,6 +190,11 @@
   </div>
 
   <aside>
+    <div class="tabs">
+      <button class="tab-btn on" id="tabBtnAlat">Alat</button>
+      <button class="tab-btn" id="tabBtnView">View</button>
+    </div>
+    <div class="tab" id="tabAlat">
     <h3>Layer</h3>
     <div id="layerList"><div class="empty">Belum ada layer.</div></div>
     <button class="btn" id="btnFrame" style="width:100%;margin-top:6px"
@@ -247,6 +300,58 @@
       <button class="btn" id="expXyz">💾 XYZ</button>
     </div>
     <div class="small">Menyimpan hasil editan (file asli tak tersentuh).</div>
+    </div>
+
+    <div class="tab hide" id="tabView">
+    <h3>Pewarnaan titik</h3>
+    <div class="fld"><span>Warna</span>
+      <select class="num" id="vMode">
+        <option value="z">Ketinggian (Z)</option>
+        <option value="jarak">Jarak dari sensor</option>
+        <option value="layer">Per layer</option>
+        <option value="tunggal">Satu warna</option>
+        <option value="asli">Warna berkas (asli)</option>
+      </select></div>
+    <div class="fld" data-untuk="gradasi"><span>Palet</span>
+      <select class="num" id="vPalet"></select></div>
+    <canvas id="vPratinjau" width="256" height="14" data-untuk="gradasi"></canvas>
+    <div class="fld" data-untuk="gradasi"><span>Sebaran</span>
+      <select class="num" id="vSebaran">
+        <option value="persentil">Persentil 2–98%</option>
+        <option value="linear">Linear (min–maks)</option>
+        <option value="kuantil">Kuantil (merata)</option>
+        <option value="manual">Rentang manual</option>
+      </select></div>
+    <div class="small" id="vSebaranKet" data-untuk="gradasi"></div>
+    <div class="fld" data-untuk="manual"><span>Rentang</span>
+      <input class="num" type="number" id="vLo" step="0.1">
+      <input class="num" type="number" id="vHi" step="0.1"> m</div>
+    <div class="ctl" data-untuk="gradasi">
+      <label>Tingkat warna <span id="vTingkatVal">halus</span></label>
+      <input type="range" id="vTingkat" min="1" max="16" value="1">
+      <div class="small">Pita bertingkat memudahkan membaca nilai dari legenda.</div>
+    </div>
+    <div class="fld" data-untuk="tunggal"><span>Warna</span>
+      <input type="color" id="vTunggal" style="flex:1;height:26px;background:none;border:none"></div>
+    <label class="fld" style="margin-top:8px">
+      <input type="checkbox" id="vLegenda" style="width:auto"> Tampilkan legenda</label>
+
+    <h3>Latar belakang</h3>
+    <div class="latar-pilih" id="vLatarPilih"></div>
+    <div class="fld"><span>Lainnya</span>
+      <input type="color" id="vLatar" style="flex:1;height:26px;background:none;border:none"></div>
+
+    <h3>Ukuran titik</h3>
+    <div class="ctl">
+      <label>Skala <span id="vSkalaVal">1,0×</span></label>
+      <input type="range" id="vSkala" min="1" max="5" step="0.1" value="1">
+      <div class="small">1× = ukuran normal, 5× = paling besar.</div>
+    </div>
+
+    <button class="btn" id="vBawaan" style="width:100%;margin-top:14px">↺ Kembalikan bawaan</button>
+    <div class="small" style="margin-top:5px">Hanya mengubah tampilan — ekspor tetap memakai warna berkas.
+      Pengaturan diingat browser.</div>
+    </div>
   </aside>
 </div>
 <script type="module" src="/static/app.js"></script>
