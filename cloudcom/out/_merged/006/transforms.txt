@@ -1,0 +1,52 @@
+# clomerged — penggabungan sadar fitur
+# Jangkauan dipotong : 9.0 m
+# Sapuan sudut       : tiap 1.0°, 22 puncak teratas
+# Penilaian tajam    : titik menonjol (>0.04 m dari bidang besar), toleransi 0.03 m
+# Pelepasan geseran  : ±1.5 m bila rasio arah lemah < 0.08
+#
+# tajam   = bagian titik MENONJOL yang mendarat tepat di permukaan acuan.
+#           Inilah yang menentukan vonis. Huruf/tiang yang meleset langsung
+#           terhukum karena toleransinya cuma 0.03 m.
+# longgar = takaran lama (10 cm, semua permukaan). Dicantumkan hanya supaya
+#           sebanding dengan run outmerge terdahulu — TIDAK memutuskan apa pun.
+#           longgar tinggi + tajam rendah = menempel di tembok, salah tempat.
+# lemah   = arah gerak yang paling tidak terkunci geometri, dan rasionya.
+#           Rasio kecil berarti hasil bisa tergelincir ke arah itu tanpa
+#           menaikkan galat — di situlah 'FILFILKOM' lahir.
+# unslide = berapa meter hasil digeser sepanjang arah lemah itu untuk
+#           membetulkannya.
+
+# Ringkasan:
+#   scan_0183_1sweep_0.ply                   tajam 0.0857  longgar 0.5067  rmse 0.0222 m  margin +0.0301  GAGAL   [ke scan_0184_1sweep_0.ply]
+#   scan_0184_1sweep_0.ply                   tajam —  longgar —  rmse — m  margin —  BAIK   [ke —]
+
+# Arah terlemah menurut Hessian, dan koreksi geseran yang dilakukan.
+# Catatan: arah yang DISAPU diambil dari tangen tembok, bukan dari
+# kolom 'terlemah' ini — kolom itu hanya laporan kondisi geometri.
+#   scan_0183_1sweep_0.ply                   terlemah: geser mendatar (-1.00, +0.05, +0.00) rasio 0.0012   → digeser +0.660 m sepanjang (-1.00, +0.05)
+#   scan_0184_1sweep_0.ply                   terlemah: tak terhitung   → tidak disapu (tak ada tembok tegak sebagai acuan arah)
+
+# Perataan tanah tiap scan (sudah termasuk di matriks gabungan):
+#   scan_0183_1sweep_0.ply                   5.78° dikoreksi
+#   scan_0184_1sweep_0.ply                   2.89° dikoreksi
+
+# Matriks gabungan tiap scan ke kerangka acuan.
+# Sudah termasuk perataan tanah; pakai langsung pada scan asli.
+
+scan_0183_1sweep_0.ply
+  status  : GAGAL
+  yaw     : 185.140°
+  matriks :
+    -0.992387   0.098830  -0.073483  -0.259796
+    -0.089261  -0.988294  -0.123726   0.211790
+    -0.084851  -0.116225   0.989592   3.543470
+     0.000000   0.000000   0.000000   1.000000
+
+scan_0184_1sweep_0.ply
+  status  : BAIK
+  yaw     : 359.978°
+  matriks :
+     0.999881  -0.000465   0.015412   0.010929
+    -0.000384   0.998482   0.055076   0.020935
+    -0.015414  -0.055075   0.998363   3.427106
+     0.000000   0.000000   0.000000   1.000000
