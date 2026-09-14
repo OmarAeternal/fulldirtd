@@ -35,6 +35,7 @@ clomerge scan_0080*.mcap scan_0081*.mcap # gabungkan beberapa scan
 ```
 riset td/
 ├── SETUP.md              ← pemasangan di komputer baru
+├── CARA_PAKAI.txt        ← rujukan lengkap tiap perintah
 ├── README.md             ← berkas ini
 ├── perintah.sh           ← definisi perintah; sumberkan dari ~/.bashrc
 │
@@ -46,10 +47,11 @@ riset td/
 │       ├── _merged/      ← hasil clomerged
 │       ├── _merge_out/   ← hasil clomergeout
 │       ├── _outmerge/    ← hasil outmerge
-│       └── _pasak/001…   ← hasil pasak
+│       ├── _pasak/001…   ← hasil pasak
+│       ├── _areascan/…   ← hasil areascan
+│       └── _mergeway/…   ← hasil mergeway
 │
 ├── ros2_ws/cloudcom/     ← PROGRAM pengolah data
-│   ├── CARA_PAKAI.txt    ← rujukan lengkap tiap perintah (385 baris)
 │   ├── requirements.txt
 │   ├── mcaptopc.py       ← .mcap → point cloud
 │   ├── clomcap.py        ← + grid + buka CloudCompare
@@ -57,6 +59,8 @@ riset td/
 │   ├── clomerged.py      ← registrasi sadar-fitur, untuk tembok polos
 │   ├── outmerge.py       ← registrasi luar ruang, peta tumbuh
 │   ├── pasak.py          ← registrasi berjangkar, manusia menunjuk
+│   ├── areascan.py       ← satu posisi, drone berputar ~90° per scan
+│   ├── mergeway.py       ← lintasan lurus, scan tiap ~10 m
 │   ├── docs/             ← catatan cara kerja tiap algoritma
 │   └── tes/  data/       ← data uji
 │
@@ -107,9 +111,11 @@ scan terhadap scan acuan.
 | `clomergeout` | versi luar ruang, scan melingkar searah | CARA_PAKAI §4 |
 | `outmerge` | luar ruang, peta yang tumbuh bertahap | CARA_PAKAI §5 |
 | `clomerged` | sadar fitur — untuk tempat bertembok polos | CARA_PAKAI §6 |
+| `areascan` | satu posisi, drone berputar ~90° per scan | CARA_PAKAI §7 |
+| `mergeway` | lintasan lurus, scan tiap ~10 m ke depan | CARA_PAKAI §8 |
 | `pasak` | registrasi berjangkar, manusia menunjuk penambat | bagian di bawah |
 | `pcs` | lihat, ukur, bersihkan, ekspor — di browser | `pointcloud_studio/README.md` |
-| `clocom` | buka CloudCompare biasa | CARA_PAKAI §7 |
+| `clocom` | buka CloudCompare biasa | CARA_PAKAI §9 |
 
 Semua perintah jalan dari folder mana pun. Paling enak dari `cloudcom/`, supaya
 nama berkasnya bisa diketik apa adanya.
@@ -274,7 +280,7 @@ yang tercatat.
 | Berkas | Isi |
 |---|---|
 | [`SETUP.md`](SETUP.md) | pemasangan di komputer baru |
-| [`ros2_ws/cloudcom/CARA_PAKAI.txt`](ros2_ws/cloudcom/CARA_PAKAI.txt) | rujukan lengkap tiap perintah beserta seluruh pilihannya |
+| [`CARA_PAKAI.txt`](CARA_PAKAI.txt) | rujukan lengkap tiap perintah beserta seluruh pilihannya |
 | [`pointcloud_studio/README.md`](pointcloud_studio/README.md) | rujukan lengkap `pcs` |
 | `ros2_ws/cloudcom/docs/` | catatan cara kerja algoritmanya |
 | `SESI_*.md` | catatan sesi kerja — apa yang dicoba dan apa hasilnya |

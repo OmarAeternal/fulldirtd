@@ -13,9 +13,9 @@ Hasil selalu masuk ke ~/riset td/cloudcom/out/, di mana pun kamu berada.
 Mau pindah? Set env var, tanpa mengubah kode:
     export CLOUDCOM_OUT="~/tempat/lain"
 
-clomcap, clomcaps, clomerge, clomergeout, outmerge, clomerged, dan clocom
-sudah jadi perintah, jalan dari mana saja. Untuk skrip yang belum (bagian 8
-dan 9 di bawah), ketik sekali per terminal:
+clomcap, clomcaps, clomerge, clomergeout, outmerge, clomerged, areascan,
+mergeway, dan clocom sudah jadi perintah, jalan dari mana saja. Untuk skrip
+yang belum (bagian 10 dan 11 di bawah), ketik sekali per terminal:
     CC="$HOME/riset td/ros2_ws/cloudcom"
 
 
@@ -320,7 +320,106 @@ Ciri tempat itu memang tidak cukup. Urutan yang biasanya menolong:
     kalau tetap: taruh benda asimetris di lokasi sebelum scan ulang
 
 
-7. clocom  —  buka CloudCompare biasa
+7. areascan  —  satu posisi, drone berputar ~90° per scan
+----------------------------------------------------------
+Drone melayang di TEMPAT yang sama dan berputar kira-kira 90° di antara dua
+scan, jadi 4 scan menutup satu lingkaran. Terima 2-4 berkas, URUT sesuai
+putaran.
+
+    areascan scan_0187_1sweep_0.mcap scan_0188_1sweep_0.mcap \
+             scan_0189_1sweep_0.mcap scan_0190_1sweep_0.mcap
+
+Cara kerjanya:
+  1. Buang titik kembar. Rekaman 0187-0190 menyimpan tiap titik dua kali.
+  2. Cari drone: gumpalan melayang tinggi di atas tanah dengan celah kosong di
+     bawahnya. Itu jadi TITIK TUMPU putaran, lalu dibuang dari peta (disimpan
+     sekali di drone.ply).
+  3. Ratakan tanah tiap scan.
+  4. Putar tiap scan di titik tumpu: 90° searah --arah dari scan sebelumnya.
+  5. Setel sudutnya dengan benda kecil di tanah (orang, tiang, tas). Karena
+     pusat putarnya sudah diketahui, SATU benda yang sama cukup menentukan
+     sudut. Itu cara menghadapi titik yang sedikit.
+  6. Sambung tanah antar scan: petak tanah yang dilihat dua scan harus
+     setinggi yang sama. Ini juga menyerap lengkung rig (tanah tiap scan
+     melengkung sepanjang satu sumbu sensor dan ikut berputar bersama drone).
+
+Hasil pada 0187-0190: langkah sudut -77, -94, -87° (tidak persis 90). Scan
+terakhir dicocokkan langsung ke scan pertama berselisih 0,87°. Beda tinggi
+tanah antar scan 11,8 -> 5,6 cm; di atas 8 m 22,9 -> 6,2 cm (diukur pada petak
+yang tidak dipakai menghitung koreksi).
+
+Hasil di out/_areascan/001/, 002/, dst:
+    merged.ply          peta gabungan
+    merged_check.ply    sama, tiap scan satu warna — paling enak untuk cek sambungan
+    <scan>.ply          tiap scan yang sudah diposisikan
+    drone.ply           titik badan drone
+    penanda.json        benda di tanah yang dipakai mencocokkan
+    laporan.txt         sudut, benda yang cocok, beda tanah, matriks tiap scan
+
+Pilihan tambahan:
+    --arah cw|ccw      arah putar dilihat dari atas (default cw — terukur cw pada
+                       0187-0190). Kalau arahnya salah, muncul
+                       [WARN] mungkin --arah terbalik
+    --langkah 90       besar putaran tebakan antar scan, derajat
+    --tanpa-sambung    lewati langkah 6; tanah hanya diratakan per scan
+    -t  --force        sama seperti clomcap
+
+YANG PERLU DIWASPADAI
+- Butuh benda kecil di tanah. Kalau yang cocok kurang dari 2, sudut jatuh ke
+  tebakan persis 90° dan laporannya bilang "dari tebakan".
+- Beda tanah yang bagus BUKAN bukti sudutnya benar — tanah tetap membaik walau
+  sudutnya keliru. Penjaganya hanya peringatan pencocokan benda.
+- Langkah 6 bukan transformasi kaku: benda ikut naik-turun sedikit. Matriks di
+  laporan.txt BELUM termasuk koreksi itu; titik yang terkoreksi ada di PLY.
+- Peta gabungan masih bisa miring serempak (~0,2-0,3 m di 12 m).
+- Wobble dan drift drone selama satu sapuan tidak dikoreksi.
+
+
+8. mergeway  —  lintasan lurus, scan tiap ~10 m drone terbang ke depan
+-----------------------------------------------------------------------
+Drone terbang lurus dan berhenti tiap --jarak meter untuk satu scan. Terima 2
+berkas atau lebih, URUT sesuai lintasan.
+
+    mergeway scan_0193_1sweep_0.mcap scan_0194_1sweep_0.mcap \
+             scan_0195_1sweep_0.mcap scan_0196_1sweep_0.mcap
+
+Cara kerjanya:
+  1. Tiap scan disiapkan sama seperti areascan (buang kembar, buang drone,
+     ratakan tanah).
+  2. Posisi tebakan = posisi scan sebelumnya + --jarak ke arah --maju.
+  3. Benda di tanah dicocokkan ke peta yang sudah terpasang, dicari dalam 4 m
+     dan ±15° dari tebakan. Hasilnya DITERIMA hanya bila ≥3 benda cocok DAN
+     tidak ada posisi lain yang sama baiknya.
+  4. Kalau tidak diterima, scan DILANJUTKAN dari tebakan ("lanjutan").
+  5. Tanah hanya diratakan per scan, tidak dipaksa menyambung. Beda tingginya
+     dilaporkan supaya bisa dinilai.
+
+Pada 0193-0196 SEMUA scan jatuh ke lanjutan: 0195 dan 0196 tidak punya satu
+benda pun, 0194 hanya 1 yang cocok. Jadi posisi di peta itu TEBAKAN, bukan
+hasil ukur, dan laporan.txt menandainya begitu.
+
+Hasil di out/_mergeway/001/, 002/, dst. Isinya sama seperti areascan, kecuali
+drone.ply berisi drone di SEMUA posisi (jejak lintasannya) dan tidak ada
+penanda.json.
+
+Pilihan tambahan:
+    --jarak 10         jarak terbang antar scan, meter (default 10)
+    --maju 0           arah terbang dalam derajat, dilihat dari atas, berlawanan
+                       jarum jam: 0 = +x sensor (arah hadap kipas scan),
+                       90 = +y, 180 = mundur, 270 = -y. Default 0 ini ASUMSI —
+                       data 0193-0196 tidak bisa memastikannya (8 arah dicoba,
+                       beda tanah 13,7-23 cm tanpa pemenang). Isi sesuai arah
+                       terbang sebenarnya.
+    --tanpa-cocok      jangan cocokkan sama sekali, murni lanjutan jarak
+    -t  --force        sama seperti clomcap
+
+SUPAYA PENCOCOKAN BISA BEKERJA
+Taruh minimal 3 benda (tas, kerucut, kursi) yang terlihat dari DUA posisi
+berurutan, jangan berjajar rapi berjarak sama sepanjang lintasan — deret
+seperti itu ditolak karena geseran sebesar jaraknya sama cocoknya.
+
+
+9. clocom  —  buka CloudCompare biasa
 --------------------------------------
     clocom                                    buka kosong
     clocom out/scan_0007_1sweep_0/*.ply       buka hasil satu scan
@@ -329,8 +428,8 @@ Ciri tempat itu memang tidak cukup. Urutan yang biasanya menolong:
 Terlepas dari terminal — terminal boleh ditutup, CloudCompare tetap jalan.
 
 
-8. mcaptopc_cli.py  —  mcap → PLY + XYZ + PNG (tanpa buka CloudCompare)
------------------------------------------------------------------------
+10. mcaptopc_cli.py  —  mcap → PLY + XYZ + PNG (tanpa buka CloudCompare)
+------------------------------------------------------------------------
 Pakai ini kalau butuh file .xyz atau PNG-nya, bukan mau langsung melihat.
 
     "$CC/.venv/bin/python" "$CC/mcaptopc_cli.py" scan_0007_1sweep_0.mcap
@@ -345,8 +444,8 @@ Pilihan tambahan:
     -t /map_3d              paksa topik tertentu
 
 
-9. make_grid.py  —  buat grid sendiri
---------------------------------------
+11. make_grid.py  —  buat grid sendiri
+---------------------------------------
 Biasanya tidak perlu (clomcap sudah otomatis). Kalau mau grid manual:
 
     "$CC/.venv/bin/python" "$CC/make_grid.py" -o grid.ply --spacing 1 a.ply
@@ -361,21 +460,25 @@ Sumbu X merah, sumbu Y hijau, garis tebal tiap 5 m.
 
 Bacaan lebih lanjut
 -------------------
-docs/cara-kerja-clomerge.md   cara kerja algoritma merge, plus referensi dan
+Semua di ros2_ws/cloudcom/docs/:
+cara-kerja-clomerge.md        cara kerja algoritma merge, plus referensi dan
                               kata kunci untuk belajar lebih dalam
-docs/slam-3d-drone.md         analisis kelayakan SLAM 3D dari drone
+slam-3d-drone.md              analisis kelayakan SLAM 3D dari drone
 
 
 Catatan
 -------
-- clomcap, clomcaps, clomerge, clomergeout, dan clocom didefinisikan di ~/.bash_aliases. Kalau perintahnya tidak
+- clomcap, clomcaps, clomerge, clomergeout, outmerge, clomerged, areascan,
+  mergeway, dan clocom didefinisikan di ~/.bash_aliases. Kalau perintahnya tidak
   dikenali, buka terminal baru atau jalankan: source ~/.bash_aliases
 - Folder ~/riset td/cloudcom/out/ boleh dihapus kapan saja; isinya dibuat ulang
   otomatis (hanya perlu konversi ulang, jadi run berikutnya lebih lama sekali).
-- Folder backup/ berisi salinan clomerge.py, test_clomerge.py, dan CARA_PAKAI.txt
-  sebelum perataan lantai ditambahkan. Kalau hasilnya dirasa kurang, kembalikan
-  dengan: cp backup/clomerge.py backup/test_clomerge.py backup/CARA_PAKAI.txt .
+- Folder ros2_ws/cloudcom/backup/ berisi salinan clomerge.py, test_clomerge.py,
+  dan CARA_PAKAI.txt versi lama, sebelum perataan lantai ditambahkan. Kalau
+  hasilnya dirasa kurang, dari folder ros2_ws/cloudcom/ kembalikan dengan:
+      cp backup/clomerge.py backup/test_clomerge.py .
   Untuk sekadar mematikan perataannya, cukup pakai --no-level.
+- Dua perintah di bawah dijalankan dari folder ros2_ws/cloudcom/.
 - clomerge butuh Open3D. Kalau hilang, pasang ulang dengan:
       .venv/bin/python -m pip install open3d
   (pakai `python -m pip`, bukan `.venv/bin/pip` — pip-nya rusak karena

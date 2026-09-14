@@ -475,6 +475,41 @@ def sambung_tanah(rata: dict, yaw: dict, geser_: dict):
 # Rangkaian
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def siapkan_scan(xyz: np.ndarray, nama: str = "scan") -> dict:
+    """Satu scan mentah → rata (kerangka tanah, titik asal di bawah drone).
+
+    → dict: rata (Nx3 tanpa drone), dasar (4x4 sensor → rata), drone (dict
+    atau None), penanda, catatan. Dipakai bersama oleh areascan dan mergeway.
+    """
+    xyz = np.asarray(xyz, dtype=np.float64)[:, :3]
+    xyz = xyz[np.isfinite(xyz).all(axis=1)]
+    n_awal = len(xyz)
+    xyz = buang_kembar(xyz)
+    c = {"titik_awal": n_awal, "titik_unik": len(xyz), "peringatan": []}
+
+    # Tanah dicari tanpa sekitar sensor: badan drone ada di sana dan
+    # jumlahnya bisa separuh scan.
+    T = pasak.kerangka_tanah(xyz[np.linalg.norm(xyz, axis=1) > 1.0])
+    if T is None:
+        raise SystemExit(f"[ERROR] {nama}: tanah tidak ditemukan")
+    d = cari_drone(xyz, T)
+    drone = None
+    if d is None:
+        c["peringatan"].append("drone tidak ditemukan — titik tumpu = sensor")
+        tumpu, bersih = np.zeros(3), xyz
+    else:
+        tumpu, bersih = d["pusat"], xyz[~d["topeng"]]
+        drone = {k: v for k, v in d.items() if k != "topeng"}
+        drone["titik"] = xyz[d["topeng"]]
+    tumpu_rata = pasak.terapkan(tumpu[None, :], T)[0]
+    dasar = geser(-tumpu_rata[0], -tumpu_rata[1]) @ T
+    rata = pasak.terapkan(bersih, dasar)
+    c.update(miring=pasak.derajat_miring(T), tumpu=tumpu_rata,
+             titik_bersih=len(bersih))
+    return {"rata": rata, "dasar": dasar, "drone": drone, "catatan": c,
+            "penanda": daftar_penanda(rata)}
+
+
 def susun(awan_mentah: dict, arah: str = ARAH_BAKU, langkah: float = LANGKAH_DEG,
           sambung: bool = True, log=print) -> dict:
     """Inti areascan, tanpa berkas. `awan_mentah` = {nama: Nx3} BERURUTAN.
@@ -494,32 +529,11 @@ def susun(awan_mentah: dict, arah: str = ARAH_BAKU, langkah: float = LANGKAH_DEG
 
     rata, dasar, drone, penanda, catatan = {}, {}, {}, {}, {}
     for nm in nama:
-        xyz = np.asarray(awan_mentah[nm], dtype=np.float64)[:, :3]
-        xyz = xyz[np.isfinite(xyz).all(axis=1)]
-        n_awal = len(xyz)
-        xyz = buang_kembar(xyz)
-        c = {"titik_awal": n_awal, "titik_unik": len(xyz), "peringatan": []}
-
-        # Tanah dicari tanpa sekitar sensor: badan drone ada di sana dan
-        # jumlahnya bisa separuh scan.
-        T = pasak.kerangka_tanah(xyz[np.linalg.norm(xyz, axis=1) > 1.0])
-        if T is None:
-            raise SystemExit(f"[ERROR] {nm}: tanah tidak ditemukan")
-        d = cari_drone(xyz, T)
-        if d is None:
-            c["peringatan"].append("drone tidak ditemukan — titik tumpu = sensor")
-            tumpu, bersih = np.zeros(3), xyz
-        else:
-            tumpu, bersih = d["pusat"], xyz[~d["topeng"]]
-            drone[nm] = {k: v for k, v in d.items() if k != "topeng"}
-            drone[nm]["titik"] = xyz[d["topeng"]]
-        tumpu_rata = pasak.terapkan(tumpu[None, :], T)[0]
-        dasar[nm] = geser(-tumpu_rata[0], -tumpu_rata[1]) @ T
-        rata[nm] = pasak.terapkan(bersih, dasar[nm])
-        c.update(miring=pasak.derajat_miring(T), tumpu=tumpu_rata,
-                 titik_bersih=len(bersih))
-        catatan[nm] = c
-        penanda[nm] = daftar_penanda(rata[nm])
+        s = siapkan_scan(awan_mentah[nm], nm)
+        rata[nm], dasar[nm], catatan[nm], penanda[nm] = (
+            s["rata"], s["dasar"], s["catatan"], s["penanda"])
+        if s["drone"] is not None:
+            drone[nm] = s["drone"]
 
     catatan[nama[0]].update(yaw=0.0, geser=np.zeros(2), asal="acuan")
     peta_penanda = penanda[nama[0]][:, :2].copy()

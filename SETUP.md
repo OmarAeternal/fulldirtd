@@ -179,7 +179,7 @@ Minta ke pemilik repo kalau butuh; dikirim lewat Drive atau cakram keras.
 Semua isi `cloudcom/out/` sebenarnya **hasil hitungan** — kalau punya `.mcap` mentahnya,
 semuanya bisa kamu lahirkan ulang sendiri.
 
-Baca `ros2_ws/cloudcom/CARA_PAKAI.txt` untuk daftar lengkap perintah dan pilihannya.
+Baca `CARA_PAKAI.txt` (di akar repo) untuk daftar lengkap perintah dan pilihannya.
 
 ---
 

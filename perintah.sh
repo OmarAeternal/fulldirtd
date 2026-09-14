@@ -60,6 +60,10 @@ pasak()       { _cc_run pasak.py       "$@"; }
 # tertangkap di tiap scan jadi titik tumpu; tanah disambung antar scan.
 areascan()    { _cc_run areascan.py    "$@"; }
 
+# Lintasan lurus: scan tiap ~10 m ke depan; cocokkan benda bila meyakinkan,
+# bila tidak lanjutkan dari scan sebelumnya.
+mergeway()    { _cc_run mergeway.py    "$@"; }
+
 # ── PointCloud Studio ─────────────────────────────────────────────────────
 # Point cloud (PLY/XYZ/MCAP) → PointCloud Studio di browser.
 pcs() {
