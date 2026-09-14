@@ -8,6 +8,34 @@ Menjawab TODO no.1 dan no.5 di `guide.pdf`:
 > 1. Atur kode untuk sekali muter aja gausah muter terus-terusan
 > 5. Coba bandingin 1x sweep sampai emang di berapa kali sweep baru bagusnya berapa
 
+## Mapping 180° (versi sekarang)
+
+Satu sweep = **180° dipetakan**, lalu **180° pulang cepat tanpa dipetakan** sampai
+LiDAR kembali ke 0°.
+
+Kenapa: bidang scan RPLIDAR C1 sudah 360°, dan sumbu putar stepper ada di bidang
+itu. Memutar bidang 180° saja sudah menyapu seluruh ruangan. 180° berikutnya menyapu
+ruang yang **sama** dari sisi sebaliknya. Selisih kalibrasi sekecil apa pun (sumbu
+tidak pas, offset sudut, backlash) membuat dua salinan itu tidak berimpit, sehingga
+objek muncul dobel.
+
+- Kecepatan fase mapping tetap diatur `rpm`/`delay`, artinya sama seperti dulu.
+  `rpm:=2` = 15 detik untuk 180° yang dipetakan.
+- Fase pulang pakai `return_rpm` (default 9, maksimal ~9,4), dengan ramp naik/turun
+  `return_ramp_steps`. Tidak pernah lebih lambat dari fase mapping.
+- `mapping_3d_sweep` membuang setiap sinar yang waktunya jatuh di fase pulang, dengan
+  acuan `/stepper/mapping_active`.
+
+**Versi lama (360° dipetakan) masih ada**, dengan akhiran `1`:
+
+```bash
+ros2 launch sweep_mapping sweep_mapping1.launch.py sweeps:=1 delay:=0.009375
+```
+
+File lamanya: `launch/sweep_mapping1.launch.py`, `stepper_sweep_node1.py`,
+`mapping_3d_sweep1.py`. Paket `sweep_mappingimu` sengaja tetap memakai
+`stepper_sweep_node1`, karena `mapping_3d_imu` belum membuang fase pulang.
+
 Paket ini **berdiri sendiri**. `stepper_controller`, `wit_ros2_imu`, dan `sllidar_ros2`
 tidak diubah sedikit pun — sistem lama tetap bisa dijalankan seperti biasa.
 
@@ -129,9 +157,11 @@ diputar. Yang terekam ya sampai titik kamu menekan Ctrl+C.
 
 | Argumen | Default | Keterangan |
 |---|---|---|
-| `sweeps` | `1` | Jumlah sweep. 1 sweep = LiDAR muter 360°. `0` = muter terus tanpa henti. |
-| `delay` | `0.018` | Detik per step motor. Makin kecil makin cepat (dan makin jarang titiknya). Cara lama, tetap berlaku. |
-| `rpm` | `0.0` | Alternatif yang lebih mudah dibaca: putaran per menit piringan LiDAR. Dipakai **hanya kalau diisi > 0**; kalau tidak, `delay` yang menentukan. Dibatasi di ~9,4 RPM oleh ketelitian `time.sleep`. |
+| `sweeps` | `1` | Jumlah sweep. 1 sweep = 180° dipetakan + 180° pulang. `0` = muter terus tanpa henti. |
+| `delay` | `0.018` | Detik per step motor selama fase mapping. Makin kecil makin cepat (dan makin jarang titiknya). Cara lama, tetap berlaku. |
+| `rpm` | `0.0` | Alternatif yang lebih mudah dibaca: putaran per menit piringan LiDAR selama fase mapping. Dipakai **hanya kalau diisi > 0**; kalau tidak, `delay` yang menentukan. Dibatasi di ~9,4 RPM oleh ketelitian `time.sleep`. |
+| `return_rpm` | `9.0` | Kecepatan fase pulang 180° (tanpa mapping). Dikunci di ~9,4 dan tidak pernah lebih lambat dari fase mapping. |
+| `return_ramp_steps` | `200` | Step untuk naik/turun kecepatan di awal dan akhir fase pulang. `0` = langsung loncat. |
 | `direction` | `1` | Arah putar motor (`1` atau `0`). |
 | `steps_per_rev` | `1600` | Step motor per satu putaran motor (setting microstepping driver). |
 | `gear_ratio` | `0.5` | Pulley motor / pulley LiDAR. 30T/60T = 0.5. |
@@ -147,13 +177,18 @@ diputar. Yang terekam ya sampai titik kamu menekan Ctrl+C.
 
 ### Berapa lama satu sweep?
 
-`steps_per_sweep = steps_per_rev / gear_ratio` = `1600 / 0.5` = **3200 step**.
-Dengan `delay=0.018` → **≈ 58 detik per sweep**. RPLIDAR C1 mengeluarkan 5 kHz pada
-`scan_mode` DenseBoost, jadi ≈ **288 ribu titik** dan ±7 MB per sweep.
-`sweeps:=5` ≈ 5 menit dan ±35 MB.
+`steps_per_sweep = steps_per_rev / gear_ratio` = `1600 / 0.5` = **3200 step**:
+1600 step dipetakan, 1600 step pulang.
+Dengan `delay=0.018` → **≈ 29 detik mapping** + ≈ 4–5 detik pulang. RPLIDAR C1
+mengeluarkan 5 kHz pada `scan_mode` DenseBoost, jadi ≈ **144 ribu titik** per sweep.
+Jumlah itu separuh dari versi 360°, tapi versi 360° memang memotret ruang yang sama dua kali.
 
 Konversinya: `delay = 0,01875 / rpm`. Jadi `delay:=0.009375` sama dengan `rpm:=2.0`
-— 30 detik per sweep, titiknya separuh.
+— 15 detik mapping.
+
+Catatan: tiap step juga mem-publish sudut dan TF, dan itu makan ±0,7 ms di laptop
+(di Pi mungkin lebih). Waktu nyata jadi sedikit lebih lama dari hitungan di atas.
+Kode lama juga begitu. Sudut tetap benar karena dihitung dari jumlah step, bukan dari waktu.
 
 Karena berhenti tepat di kelipatan 3200 step, sudut LiDAR dijamin kembali ke 0.000° —
 tidak ada sisa miring, berapa pun jumlah sweep-nya.
@@ -165,8 +200,9 @@ tidak ada sisa miring, berapa pun jumlah sweep-nya.
 | Topic | Tipe | Arah | Keterangan |
 |---|---|---|---|
 | `/map_3d` | `PointCloud2` | keluar | Cloud kumulatif. Tiap pesan berisi **seluruh** titik sejauh ini. Frame `base_link`. |
-| `/stepper/sweep_count` | `Int32` | keluar | Sweep ke berapa yang sudah selesai (latched). |
-| `/stepper/sweep_done` | `Bool` | keluar | `true` saat semua sweep beres (latched). |
+| `/stepper/sweep_count` | `Int32` | keluar | Naik saat fase mapping 180° sebuah sweep selesai (latched). |
+| `/stepper/sweep_done` | `Bool` | keluar | `true` saat sweep terakhir sudah pulang ke 0° (latched). |
+| `/stepper/mapping_active` | `Bool` | keluar | `true` selama fase mapping, `false` selama fase pulang (latched). Ikut direkam di bag. |
 | `/stepper/angle` | `Float32` | keluar | Sudut LiDAR (rad), sama seperti node lama. |
 | `/stepper/steps`, `/stepper/status` | | keluar | Sama seperti node lama. |
 | `/stepper/enable`, `/stepper/direction`, `/stepper/speed` | | masuk | Sama seperti node lama, masih berfungsi. |

@@ -56,6 +56,10 @@ clomerged()   { _cc_run clomerged.py   "$@"; }
 # Registrasi berjangkar: pasak lantai & tembok sebagai penambat.
 pasak()       { _cc_run pasak.py       "$@"; }
 
+# Satu posisi, 2-4 arah hadap (drone berputar ~90° per scan). Drone yang
+# tertangkap di tiap scan jadi titik tumpu; tanah disambung antar scan.
+areascan()    { _cc_run areascan.py    "$@"; }
+
 # ── PointCloud Studio ─────────────────────────────────────────────────────
 # Point cloud (PLY/XYZ/MCAP) → PointCloud Studio di browser.
 pcs() {

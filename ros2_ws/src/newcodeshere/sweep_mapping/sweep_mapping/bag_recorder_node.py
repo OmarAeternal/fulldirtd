@@ -36,6 +36,7 @@ DEFAULT_TOPICS = [
     '/stepper/status',
     '/stepper/sweep_count',
     '/stepper/sweep_done',
+    '/stepper/mapping_active',
     '/map_3d',
     '/odom',
     '/tf',

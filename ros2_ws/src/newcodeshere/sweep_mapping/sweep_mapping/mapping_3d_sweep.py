@@ -1,6 +1,17 @@
-"""VERSI LAMA - 360 derajat penuh dipetakan. Versi baru ada di file tanpa angka 1.
+"""Mapping 3D yang hanya memetakan fase 180 derajat dari tiap sweep.
 
-Mapping 3D yang mengakumulasi N sweep menjadi satu pointcloud utuh.
+Pasangan stepper_sweep_node.py: satu sweep = 180 derajat dipetakan + 180 derajat
+pulang cepat. Scan yang jatuh di fase pulang DIBUANG, supaya ruang yang sama tidak
+terpetakan dua kali (penyebab objek dobel di versi lama, mapping_3d_sweep1.py).
+
+Fase dibaca dari /stepper/mapping_active. Setiap perubahan dicatat dengan waktu
+terimanya - jam yang sama dengan riwayat /stepper/angle - lalu tiap SINAR (bukan
+tiap pesan scan) diperiksa apakah waktunya jatuh di dalam jendela mapping. Satu
+pesan /scan yang kebetulan melintasi batas 180 derajat terpotong tepat di batas.
+
+Kalau /stepper/mapping_active tidak pernah datang (misal memutar ulang bag lama
+dari stepper_sweep_node1), semua scan dipakai seperti versi lama dan health_check
+memberi peringatan.
 
 Perbedaan dengan stepper_controller/mapping_3d.py:
   * Buffer titik TIDAK dikosongkan tiap sweep -> semua sweep menumpuk jadi satu cloud.
@@ -64,6 +75,10 @@ class Mapping3DSweep(Node):
 
         self.servo_times = []
         self.servo_angles = []
+        # Jendela waktu fase MAPPING: [mulai, selesai]; selesai=None = masih jalan.
+        self.mapping_windows = []
+        self.mapping_gate_seen = False
+        self.gate_warned = False
         self.chunks = []
         self.total_points = 0
         self.sweeps_seen = 0
@@ -81,8 +96,14 @@ class Mapping3DSweep(Node):
         self.create_subscription(
             Bool, '/stepper/sweep_done', self.sweep_done_callback, latched_qos()
         )
+        self.create_subscription(
+            Bool, '/stepper/mapping_active', self.mapping_active_callback,
+            latched_qos()
+        )
 
-        self.map_pub = self.create_publisher(PointCloud2, '/map_3d', 10)
+        # Latched: cloud terakhir disimpan, jadi Foxglove/RViz yang baru tersambung
+        # SETELAH cloud dikirim (misal scan sudah selesai) tetap langsung menerimanya.
+        self.map_pub = self.create_publisher(PointCloud2, '/map_3d', latched_qos())
 
         period = float(self.get_parameter('health_check_period').value)
         if period > 0:
@@ -92,7 +113,7 @@ class Mapping3DSweep(Node):
             f'Mapping3DSweep started (frame={self.frame_id}, '
             f'rotation_sign={self.rotation_sign:+.0f}, '
             f'tilt_offset={math.degrees(self.tilt_offset):+.2f} deg). '
-            'Menunggu data sweep...'
+            'Hanya fase mapping 180 derajat yang dipetakan. Menunggu data sweep...'
         )
 
     # ==========================================================
@@ -121,6 +142,15 @@ class Mapping3DSweep(Node):
 
         self.health_ticks += 1
         has_servo = len(self.servo_times) >= 2
+
+        if (not self.mapping_gate_seen and not self.gate_warned
+                and self.scans_received > 0 and has_servo):
+            self.gate_warned = True
+            self.get_logger().warn(
+                '/stepper/mapping_active belum pernah datang - SEMUA scan dipakai, '
+                'termasuk fase pulang (hasil bisa dobel seperti versi 360 derajat). '
+                'Pastikan yang jalan stepper_sweep_node, bukan stepper_sweep_node1.'
+            )
 
         if self.scans_received == 0 and not has_servo:
             self.get_logger().error(
@@ -158,6 +188,27 @@ class Mapping3DSweep(Node):
         if len(self.servo_times) > 100:
             self.servo_times.pop(0)
             self.servo_angles.pop(0)
+
+    def mapping_active_callback(self, msg):
+        t = self.now_sec()
+        self.mapping_gate_seen = True
+        windows = self.mapping_windows
+
+        if msg.data:
+            if not windows or windows[-1][1] is not None:
+                windows.append([t, None])
+        elif windows and windows[-1][1] is None:
+            windows[-1][1] = t
+
+    def in_mapping_window(self, times):
+        """Mask bool: sinar mana yang waktunya jatuh di fase MAPPING."""
+        mask = np.zeros(times.shape, dtype=bool)
+        for start, end in self.mapping_windows:
+            inside = times >= start
+            if end is not None:
+                inside &= times <= end
+            mask |= inside
+        return mask
 
     def sweep_count_callback(self, msg):
         count = int(msg.data)
@@ -227,20 +278,30 @@ class Mapping3DSweep(Node):
             )
 
         keep = np.flatnonzero(valid)
-        if self.max_points > 0:
-            keep = keep[:self.max_points - self.total_points]
-
-        count = keep.size
-        if count == 0:
-            return
 
         time_increment = msg.time_increment
         if time_increment <= 0.0:
             time_increment = (1.0 / 10.0) / ranges.size
 
         scan_start = self.header_time_sec(msg.header)
+        ray_times = scan_start + keep * time_increment
+
+        # Buang sinar yang diambil di fase pulang (atau sebelum mapping mulai).
+        if self.mapping_gate_seen:
+            inside = self.in_mapping_window(ray_times)
+            keep = keep[inside]
+            ray_times = ray_times[inside]
+
+        if self.max_points > 0:
+            sisa = self.max_points - self.total_points
+            keep = keep[:sisa]
+            ray_times = ray_times[:sisa]
+
+        count = keep.size
+        if count == 0:
+            return
+
         offset_times = keep * time_increment
-        ray_times = scan_start + offset_times
 
         # Sudut stepper untuk tiap sinar, diinterpolasi dari riwayat /stepper/angle.
         servo_angle = np.interp(

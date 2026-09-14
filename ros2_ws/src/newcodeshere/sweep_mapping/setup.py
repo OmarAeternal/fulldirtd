@@ -26,6 +26,9 @@ setup(
             'stepper_sweep_node = sweep_mapping.stepper_sweep_node:main',
             'mapping_3d_sweep = sweep_mapping.mapping_3d_sweep:main',
             'bag_recorder_node = sweep_mapping.bag_recorder_node:main',
+            # Versi lama: 360 derajat penuh dipetakan (hasil objek ganda).
+            'stepper_sweep_node1 = sweep_mapping.stepper_sweep_node1:main',
+            'mapping_3d_sweep1 = sweep_mapping.mapping_3d_sweep1:main',
         ],
     },
 )

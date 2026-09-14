@@ -1,9 +1,11 @@
-"""Launch mapping 3D dengan jumlah sweep yang bisa diatur.
+"""VERSI LAMA (360 derajat penuh dipetakan). Versi baru: sweep_mapping.launch.py.
+
+Launch mapping 3D dengan jumlah sweep yang bisa diatur.
 
 Contoh:
-    ros2 launch sweep_mapping sweep_mapping.launch.py sweeps:=3
+    ros2 launch sweep_mapping sweep_mapping1.launch.py sweeps:=3
 
-Menyalakan: IMU -> LiDAR -> stepper_sweep_node -> mapping_3d_sweep -> foxglove_bridge.
+Menyalakan: IMU -> LiDAR -> stepper_sweep_node1 -> mapping_3d_sweep1 -> foxglove_bridge.
 Paket wit_ros2_imu, sllidar_ros2, dan stepper_controller tidak diubah sama sekali;
 launch ini hanya memanggil launch file mereka yang sudah ada.
 """
@@ -128,7 +130,7 @@ def generate_launch_description():
 
     stepper_node = Node(
         package='sweep_mapping',
-        executable='stepper_sweep_node',
+        executable='stepper_sweep_node1',
         name='stepper_sweep_node',
         output='screen',
         parameters=[{
@@ -151,7 +153,7 @@ def generate_launch_description():
 
     mapping_node = Node(
         package='sweep_mapping',
-        executable='mapping_3d_sweep',
+        executable='mapping_3d_sweep1',
         name='mapping_3d_sweep',
         output='screen',
         parameters=[{

@@ -35,7 +35,7 @@ from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Bool, Float32, Int32
 
 from sweep_mapping.cloud_utils import POINT_DTYPE, merge_chunks
-from sweep_mapping.mapping_3d_sweep import Mapping3DSweep
+from sweep_mapping.mapping_3d_sweep1 import Mapping3DSweep
 
 TIPE_PESAN = {
     'sensor_msgs/msg/LaserScan': LaserScan,

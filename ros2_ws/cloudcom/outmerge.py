@@ -66,28 +66,28 @@ import make_grid as mg
 from clomcap import launch_cloudcompare  # noqa: F401  (dipakai lewat global modul)
 from clomerge import BAIK, RAGU, GAGAL, SCAN_COLORS
 
-MERGE_DIRNAME = "_outmerge"
+MERGE_DIRNAME = "ooutmerge"
 
 # ── pemotongan jarak ───────────────────────────────────────────────────────────
 # Titik jauh di luar ruangan hampir selalu jarang, miring, dan tidak dilihat
 # scan tetangga. Ia menambah beban hitung tanpa menambah ciri yang bisa
 # dicocokkan, dan ikut menyeret ICP. Dipotong bola, bukan kotak, supaya
 # kerapatannya seragam ke segala arah.
-DEFAULT_RANGE = 6.0
+DEFAULT_RANGE = 9.0
 
 # ── perataan tanah ────────────────────────────────────────────────────────────
-GROUND_DIST = 0.06      # toleransi RANSAC bidang tanah (m)
-GROUND_FRAC = 0.40      # bidang dicari di sekian bagian titik terbawah
-GROUND_MIN_INLIER = 0.25  # di bawah ini, bidangnya tidak dipercaya
+GROUND_DIST = 0.09       # toleransi RANSAC bidang tanah (m)
+GROUND_FRAC = 0.30      # bidang dicari di sekian bagian titik terbawah
+GROUND_MIN_INLIER = 0.20  # di bawah ini, bidangnya tidak dipercaya
 
 # ── citra tampak-atas ─────────────────────────────────────────────────────────
-BEV_CELL = 0.10         # sisi sel citra (m)
-BEV_ZMIN = 0.30         # di bawah ini dianggap tanah — datar, tak berciri
+BEV_CELL = 0.05         # sisi sel citra (m)
+BEV_ZMIN = 0.2         # di bawah ini dianggap tanah — datar, tak berciri
 BEV_ZMAX = 5.00         # di atas ini biasanya dahan/langit, jarang dan berubah
-BEV_SUB = 40_000        # titik yang dicicip untuk membuat citra
-DEFAULT_STEP_DEG = 2.0  # kerapatan sapuan sudut
-DEFAULT_SEEDS = 14      # berapa puncak teratas dilanjutkan ke ICP
-SEED_NMS_DEG = 8.0      # puncak yang lebih dekat dari ini dianggap sama
+BEV_SUB = 52_000        # titik yang dicicip untuk membuat citra
+DEFAULT_STEP_DEG = 1.0  # kerapatan sapuan sudut
+DEFAULT_SEEDS = 22      # berapa puncak teratas dilanjutkan ke ICP
+SEED_NMS_DEG = 45.0      # puncak yang lebih dekat dari ini dianggap sama
 
 # ── penilaian ─────────────────────────────────────────────────────────────────
 # Dinilai hanya pada permukaan tegak di atas tanah. Tanah cocok pada putaran
@@ -100,7 +100,7 @@ EVAL_NZ = 0.60          # |nz| di bawah ini dianggap permukaan tegak
 EVAL_MIN_POINTS = 500
 
 ICP_SCALES = (0.60, 0.30, 0.15, 0.08)
-ICP_ITER = 60
+ICP_ITER = 130
 
 # Ambang mutu. Nilainya lebih rendah dari clomerge karena diukur dengan
 # takaran yang lebih ketat: hanya permukaan tegak, sesudah dijarangkan 5 cm.
@@ -108,7 +108,7 @@ FITNESS_BAIK = 0.30
 FITNESS_RAGU = 0.15
 RMSE_BAIK = 0.06
 
-DEFAULT_ROUNDS = 2      # putaran perapian setelah semua terpasang
+DEFAULT_ROUNDS = 3      # putaran perapian setelah semua terpasang
 
 
 def _o3d():

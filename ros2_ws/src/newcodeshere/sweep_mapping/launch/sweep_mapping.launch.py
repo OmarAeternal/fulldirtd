@@ -1,14 +1,14 @@
-"""Launch mapping 3D dengan koreksi IMU, untuk rig yang dipasang di drone.
+"""Launch mapping 3D: tiap sweep memetakan 180 derajat, lalu pulang cepat 180 derajat.
 
 Contoh:
-    ros2 launch sweep_mappingimu sweep_mappingimu.launch.py sweeps:=1
-    ros2 launch sweep_mappingimu sweep_mappingimu.launch.py sweeps:=1 rpm:=2.0
+    ros2 launch sweep_mapping sweep_mapping.launch.py sweeps:=1 rpm:=2.0
+    ros2 launch sweep_mapping sweep_mapping.launch.py sweeps:=1 delay:=0.009375
 
-Menyalakan: IMU -> LiDAR -> stepper_sweep_node -> mapping_3d_imu -> foxglove_bridge.
+Versi lama (360 derajat penuh dipetakan): sweep_mapping1.launch.py.
 
-Stepper dan bag recorder dipanggil dari paket sweep_mapping, bukan disalin ke
-sini. Jadi perubahan pada keduanya (misalnya perhitungan RPM) otomatis berlaku
-untuk kedua launch file dan tidak bisa menyimpang diam-diam.
+Menyalakan: IMU -> LiDAR -> stepper_sweep_node -> mapping_3d_sweep -> foxglove_bridge.
+Paket wit_ros2_imu, sllidar_ros2, dan stepper_controller tidak diubah sama sekali;
+launch ini hanya memanggil launch file mereka yang sudah ada.
 """
 
 import os
@@ -29,21 +29,35 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'sweeps',
             default_value='1',
-            description='Jumlah sweep (1 sweep = LiDAR muter 360 derajat). '
-                        '0 = muter terus tanpa henti.',
+            description='Jumlah sweep (1 sweep = 180 derajat dipetakan + '
+                        '180 derajat pulang cepat). 0 = muter terus tanpa henti.',
         ),
         DeclareLaunchArgument(
             'delay',
             default_value='0.018',
-            description='Detik per step motor. Makin kecil makin cepat. '
-                        'Cara lama, tetap berlaku.',
+            description='Detik per step motor selama fase mapping. '
+                        'Makin kecil makin cepat. Cara lama, tetap berlaku.',
         ),
         DeclareLaunchArgument(
             'rpm',
             default_value='0.0',
             description='Kecepatan putar piringan LiDAR (putaran per menit), '
                         'alternatif yang lebih mudah dibaca. Dipakai hanya '
-                        'kalau diisi > 0; kalau tidak, `delay` yang menentukan.',
+                        'kalau diisi > 0; kalau tidak, `delay` yang menentukan. '
+                        '1.0 RPM = 30 detik untuk 180 derajat yang dipetakan.',
+        ),
+        DeclareLaunchArgument(
+            'return_rpm',
+            default_value='7.0',
+            description='Kecepatan fase pulang 180 derajat (tanpa mapping), '
+                        'putaran per menit piringan LiDAR. Maks ~9,4; tidak '
+                        'pernah lebih lambat dari fase mapping.',
+        ),
+        DeclareLaunchArgument(
+            'return_ramp_steps',
+            default_value='200',
+            description='Step untuk naik/turun kecepatan di awal dan akhir '
+                        'fase pulang. 0 = langsung loncat.',
         ),
         DeclareLaunchArgument(
             'direction',
@@ -68,47 +82,23 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'invert_rotation',
             default_value='true',
-            description='true = rotasi -sudut (sama seperti sweep_mapping).',
+            description='true = rotasi -sudut (sama seperti mapping_3d.py yang lama).',
         ),
         DeclareLaunchArgument(
             'publish_every_sweep',
             default_value='true',
-            description='Publish cloud kumulatif tiap sweep selesai, bukan cuma di akhir.',
-        ),
-        DeclareLaunchArgument(
-            'tilt_offset_deg',
-            default_value='0.0',
-            description='Koreksi kemiringan tetap (derajat) terhadap sumbu putar '
-                        'stepper, kalau posisi awal LiDAR tidak benar-benar datar.',
-        ),
-        DeclareLaunchArgument(
-            'imu_topic',
-            default_value='/imu/data_raw',
-            description='Topic sensor_msgs/Imu yang dipakai untuk koreksi.',
-        ),
-        DeclareLaunchArgument(
-            'use_yaw',
-            default_value='false',
-            description='Ikut mengoreksi yaw. Default mati karena yaw berasal '
-                        'dari magnetometer, yang kacau di dekat motor drone. '
-                        'Nyalakan hanya kalau uji lapangan menunjukkan bersih.',
-        ),
-        DeclareLaunchArgument(
-            'imu_roll_offset_deg',
-            default_value='0.0',
-            description='Bias pemasangan IMU pada sumbu roll. Isi dari angka '
-                        'yang dilaporkan node saat rig berdiri di meja datar.',
-        ),
-        DeclareLaunchArgument(
-            'imu_pitch_offset_deg',
-            default_value='0.0',
-            description='Bias pemasangan IMU pada sumbu pitch. Isi dari angka '
-                        'yang dilaporkan node saat rig berdiri di meja datar.',
+            description='Publish cloud kumulatif tiap fase mapping selesai, bukan cuma di akhir.',
         ),
         DeclareLaunchArgument(
             'foxglove',
             default_value='true',
             description='Nyalakan foxglove_bridge untuk lihat hasil dari laptop.',
+        ),
+        DeclareLaunchArgument(
+            'tilt_offset_deg',
+            default_value='0.0',
+            description='Koreksi kemiringan tetap (derajat) kalau posisi awal '
+                        'LiDAR tidak benar-benar datar.',
         ),
         DeclareLaunchArgument(
             'record',
@@ -122,7 +112,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'bag_prefix',
-            default_value='scanimu',
+            default_value='scan',
             description='Awalan nama bag. Hasil: <prefix>_0001_<n>sweep.',
         ),
         DeclareLaunchArgument(
@@ -154,9 +144,7 @@ def generate_launch_description():
 
     stepper_node = Node(
         package='sweep_mapping',
-        # Versi 360 derajat. mapping_3d_imu belum membuang fase pulang milik
-        # stepper_sweep_node (versi 180 derajat), jadi jangan ditukar dulu.
-        executable='stepper_sweep_node1',
+        executable='stepper_sweep_node',
         name='stepper_sweep_node',
         output='screen',
         parameters=[{
@@ -166,6 +154,10 @@ def generate_launch_description():
                 LaunchConfiguration('delay'), value_type=float),
             'rpm': ParameterValue(
                 LaunchConfiguration('rpm'), value_type=float),
+            'return_rpm': ParameterValue(
+                LaunchConfiguration('return_rpm'), value_type=float),
+            'return_ramp_steps': ParameterValue(
+                LaunchConfiguration('return_ramp_steps'), value_type=int),
             'direction': ParameterValue(
                 LaunchConfiguration('direction'), value_type=int),
             'steps_per_rev': ParameterValue(
@@ -178,9 +170,9 @@ def generate_launch_description():
     )
 
     mapping_node = Node(
-        package='sweep_mappingimu',
-        executable='mapping_3d_imu',
-        name='mapping_3d_imu',
+        package='sweep_mapping',
+        executable='mapping_3d_sweep',
+        name='mapping_3d_sweep',
         output='screen',
         parameters=[{
             'invert_rotation': ParameterValue(
@@ -189,13 +181,6 @@ def generate_launch_description():
                 LaunchConfiguration('publish_every_sweep'), value_type=bool),
             'tilt_offset_deg': ParameterValue(
                 LaunchConfiguration('tilt_offset_deg'), value_type=float),
-            'imu_topic': LaunchConfiguration('imu_topic'),
-            'use_yaw': ParameterValue(
-                LaunchConfiguration('use_yaw'), value_type=bool),
-            'imu_roll_offset_deg': ParameterValue(
-                LaunchConfiguration('imu_roll_offset_deg'), value_type=float),
-            'imu_pitch_offset_deg': ParameterValue(
-                LaunchConfiguration('imu_pitch_offset_deg'), value_type=float),
         }],
     )
 

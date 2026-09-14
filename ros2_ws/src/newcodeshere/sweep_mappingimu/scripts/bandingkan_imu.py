@@ -31,7 +31,7 @@ from sensor_msgs.msg import Imu, LaserScan
 from std_msgs.msg import Bool, Float32, Int32
 
 from sweep_mapping.cloud_utils import merge_chunks
-from sweep_mapping.mapping_3d_sweep import Mapping3DSweep
+from sweep_mapping.mapping_3d_sweep1 import Mapping3DSweep
 from sweep_mappingimu.mapping_3d_imu import Mapping3DImu, quat_to_rpy
 
 TIPE_PESAN = {
