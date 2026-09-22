@@ -4,6 +4,7 @@
     pcs merged.ply
     pcs sweep_1.ply sweep_2.ply        # tiap berkas jadi satu layer
     pcs scan_0007_1sweep_0.mcap
+    pcs 193-196                        # = scan_0193 … scan_0196 (_1sweep_0.mcap)
 
 Berkas diselesaikan jadi PLY/XYZ (MCAP dikonversi lewat proyek `ros2_ws/cloudcom`,
 memakai cache bila hasil lama masih segar), server dipastikan hidup, lalu browser
@@ -15,6 +16,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import signal
 import socket
 import subprocess
@@ -112,6 +114,52 @@ def konversi_mcap(src: pathlib.Path, topic, force: bool) -> pathlib.Path:
     return pathlib.Path(pathlib.Path(jalur_hasil).read_text().strip())
 
 
+NOMOR_POLA = "scan_{:04d}_1sweep_0.mcap"
+_NOMOR_RE = re.compile(r"^(\d{1,4})(?:-(\d{1,4}))?$")
+
+
+def folder_data() -> pathlib.Path:
+    """Folder .mcap: induk folder out/ milik cloudcom (ikut CLOUDCOM_OUT)."""
+    env = os.environ.get("CLOUDCOM_OUT")
+    out = pathlib.Path(env).expanduser() if env else (
+        pathlib.Path.home() / "riset td" / "cloudcom" / "out")
+    return out.parent
+
+
+def luaskan_nomor(files, cari_di=None) -> list:
+    """`193-196` / `196-193` / `195` → nama berkas scan. Nama biasa dibiarkan.
+
+    Sama perilakunya dengan `clomcaps.luaskan_nomor` di cloudcom. Disalin,
+    bukan diimpor, karena kedua proyek sengaja memakai venv terpisah.
+    Nomor yang berkasnya tak ada menghentikan perintah, bukan dilompati.
+    """
+    if cari_di is None:
+        cari_di = [pathlib.Path.cwd(), folder_data()]
+    cari_di = list(dict.fromkeys(pathlib.Path(d).resolve() for d in cari_di))
+    out, hilang = [], []
+    for f in files:
+        m = _NOMOR_RE.match(str(f))
+        if not m or pathlib.Path(f).expanduser().exists():
+            out.append(f)
+            continue
+        a = int(m.group(1))
+        b = int(m.group(2)) if m.group(2) else a
+        langkah = 1 if b >= a else -1
+        for n in range(a, b + langkah, langkah):
+            nama = NOMOR_POLA.format(n)
+            ada = next((d / nama for d in cari_di if (d / nama).is_file()), None)
+            if ada is None:
+                hilang.append(nama)
+            else:
+                out.append(ada)
+    if hilang:
+        raise SystemExit(
+            f"[ERROR] Tidak ditemukan di {' atau '.join(str(d) for d in cari_di)}:\n  "
+            + "\n  ".join(hilang)
+            + "\nTulis nomornya satu per satu untuk melompati yang tidak ada.")
+    return out
+
+
 def siapkan_berkas(args):
     """Argumen berkas → daftar path PLY/XYZ absolut yang siap dibuka.
 
@@ -123,7 +171,7 @@ def siapkan_berkas(args):
     mengonversi yang pertama.
     """
     sumber = []
-    for mentah in args.file:
+    for mentah in luaskan_nomor(args.file):
         src = pathlib.Path(mentah).expanduser()
         if not src.is_file():
             raise SystemExit(f"[ERROR] File tidak ditemukan: {src}")
@@ -247,7 +295,8 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pcs",
         description="Buka point cloud (.ply/.xyz/.mcap) di PointCloud Studio.")
     ap.add_argument("file", nargs="*", default=[],
-                    help="berkas .ply, .xyz, .mcap, atau .mcap.zstd; boleh lebih "
+                    help="berkas .ply, .xyz, .mcap, atau .mcap.zstd, atau nomor "
+                         "scan (193-196, 195); boleh lebih "
                          "dari satu (tiap berkas jadi satu layer), boleh juga "
                          "dikosongkan untuk membuka aplikasinya saja")
     ap.add_argument("--voxel", type=float, default=VOXEL_BAWAAN,

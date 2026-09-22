@@ -1,3 +1,4 @@
+import pathlib
 """Tes bagian logika perintah `pcs`."""
 import pytest
 
@@ -137,3 +138,44 @@ def test_ekstensi_asing_gagal_sebelum_konversi(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         pcs.siapkan_berkas(a)
     assert dipanggil == []
+
+
+# ── Nomor scan: `pcs 193-196` sebagai ganti nama berkas panjang ──────────────
+
+def _scan(d, n):
+    p = d / pcs.NOMOR_POLA.format(n)
+    p.write_text("")
+    return p
+
+
+def test_rentang_nomor_diluaskan_urut(tmp_path):
+    for n in (192, 193, 194):
+        _scan(tmp_path, n)
+    hasil = pcs.luaskan_nomor(["192-194"], cari_di=[tmp_path])
+    assert [p.name for p in hasil] == [pcs.NOMOR_POLA.format(n) for n in (192, 193, 194)]
+
+
+def test_rentang_terbalik_dan_nomor_tunggal(tmp_path):
+    for n in (190, 191, 196):
+        _scan(tmp_path, n)
+    hasil = pcs.luaskan_nomor(["191-190", "a.ply", "196"], cari_di=[tmp_path])
+    assert [pathlib.Path(p).name for p in hasil] == [
+        "scan_0191_1sweep_0.mcap", "scan_0190_1sweep_0.mcap", "a.ply",
+        "scan_0196_1sweep_0.mcap"]
+
+
+def test_nomor_bolong_berhenti_menyebut_nomornya(tmp_path):
+    _scan(tmp_path, 190)
+    with pytest.raises(SystemExit) as e:
+        pcs.luaskan_nomor(["190-191"], cari_di=[tmp_path])
+    assert "scan_0191_1sweep_0.mcap" in str(e.value)
+
+
+def test_siapkan_berkas_menerima_nomor(tmp_path, monkeypatch):
+    for n in (193, 194):
+        _scan(tmp_path, n)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(pcs, "konversi_mcap", lambda src, *a, **k: src.with_suffix(".ply"))
+    a = pcs.build_parser().parse_args(["193-194"])
+    assert [p.name for p in pcs.siapkan_berkas(a)] == [
+        "scan_0193_1sweep_0.ply", "scan_0194_1sweep_0.ply"]

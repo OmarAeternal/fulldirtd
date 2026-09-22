@@ -18,6 +18,22 @@ mergeway, dan clocom sudah jadi perintah, jalan dari mana saja. Untuk skrip
 yang belum (bagian 10 dan 11 di bawah), ketik sekali per terminal:
     CC="$HOME/riset td/ros2_ws/cloudcom"
 
+CARA SINGKAT MENULIS BERKAS: NOMOR SCAN
+Untuk berkas berformat scan_NNNN_1sweep_0.mcap, nama panjangnya boleh diganti
+nomornya saja. Berlaku di clomcaps, clomerge, clomergeout, outmerge,
+clomerged, pasak siapkan, areascan, mergeway, dan pcs:
+
+    mergeway 193-196          sama dengan scan_0193 … scan_0196 (_1sweep_0.mcap)
+    areascan 190-187          rentang terbalik = urutan terbalik
+    outmerge 80 82 83         nomor satu per satu
+    clomerge 80-82 a.ply      bercampur dengan nama berkas biasa
+    pcs 193-196               buka keempatnya di PointCloud Studio, tiap scan satu layer
+
+Nama berkas asli tetap bisa dipakai seperti biasa. Berkas dicari di folder
+tempat perintah dijalankan, lalu di ~/riset td/cloudcom/. Kalau ada nomor
+dalam rentang yang berkasnya tidak ada, perintah berhenti dan menyebut
+nomornya — tulis nomor satu per satu untuk melompatinya.
+
 
 1. clomcap  —  mcap → CloudCompare + grid, satu perintah
 --------------------------------------------------------

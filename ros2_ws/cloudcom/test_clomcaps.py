@@ -288,3 +288,57 @@ def test_run_single_file_still_works(tmp_path, monkeypatch):
     assert len(opened["files"]) == 2
     assert opened["files"][0].endswith("grid.ply")
     assert opened["files"][1] == os.path.abspath(a)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# luaskan_nomor — `190-194` sebagai ganti nama berkas panjang
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _scan(d, n):
+    p = d / clomcaps.NOMOR_POLA.format(n)
+    p.write_bytes(b"")
+    return p
+
+
+def test_rentang_diluaskan_urut(tmp_path):
+    for n in range(189, 195):
+        _scan(tmp_path, n)
+    hasil = clomcaps.luaskan_nomor(["190-193"], cari_di=[tmp_path])
+    assert [Path(h).name for h in hasil] == [clomcaps.NOMOR_POLA.format(n)
+                                             for n in (190, 191, 192, 193)]
+
+
+def test_rentang_terbalik_urutan_terbalik(tmp_path):
+    for n in (190, 191, 192):
+        _scan(tmp_path, n)
+    hasil = clomcaps.luaskan_nomor(["192-190"], cari_di=[tmp_path])
+    assert [Path(h).name[5:9] for h in hasil] == ["0192", "0191", "0190"]
+
+
+def test_nomor_tunggal_dan_nama_asli_bercampur(tmp_path):
+    _scan(tmp_path, 196)
+    hasil = clomcaps.luaskan_nomor(["a.ply", "196", "b.mcap"], cari_di=[tmp_path])
+    assert hasil[0] == "a.ply" and hasil[2] == "b.mcap"
+    assert Path(hasil[1]).name == "scan_0196_1sweep_0.mcap"
+
+
+def test_nomor_bolong_berhenti(tmp_path):
+    _scan(tmp_path, 190)
+    _scan(tmp_path, 192)
+    with pytest.raises(SystemExit) as e:
+        clomcaps.luaskan_nomor(["190-192"], cari_di=[tmp_path])
+    assert "scan_0191_1sweep_0.mcap" in str(e.value)
+
+
+def test_berkas_bernama_angka_tetap_berkas(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "190-194").write_bytes(b"")
+    assert clomcaps.luaskan_nomor(["190-194"], cari_di=[tmp_path]) == ["190-194"]
+
+
+def test_folder_kedua_dipakai_bila_tak_ada_di_folder_kerja(tmp_path):
+    kerja, data = tmp_path / "kerja", tmp_path / "data"
+    kerja.mkdir()
+    data.mkdir()
+    p = _scan(data, 193)
+    assert clomcaps.luaskan_nomor(["193"], cari_di=[kerja, data]) == [str(p)]

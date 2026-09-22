@@ -15,6 +15,7 @@ Pemakaian:
 """
 import argparse
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -30,8 +31,56 @@ from clomcap import launch_cloudcompare  # noqa: F401  (dipakai lewat global mod
 MULTI_DIRNAME = "_multi"
 
 
+NOMOR_POLA = "scan_{:04d}_1sweep_0.mcap"
+_NOMOR_RE = re.compile(r"^(\d{1,4})(?:-(\d{1,4}))?$")
+
+
+def luaskan_nomor(files: list, cari_di=None) -> list:
+    """Ganti nomor scan dengan nama berkasnya. Nama berkas biasa dibiarkan.
+
+        190-194   → scan_0190_1sweep_0.mcap … scan_0194_1sweep_0.mcap
+        194-190   → sama, urutan terbalik
+        192       → scan_0192_1sweep_0.mcap
+
+    Berkas dicari di folder kerja dulu, lalu di folder data (induk out/).
+    Kalau ada nomor yang berkasnya tak ditemukan, berhenti dengan galat —
+    rentang yang diam-diam bolong menggeser urutan, dan areascan/mergeway
+    menaruh scan menurut urutan itu.
+    """
+    if cari_di is None:
+        cari_di = [Path.cwd(), Path(clomcap.OUT_ROOT).parent]
+    cari_di = list(dict.fromkeys(Path(d).resolve() for d in cari_di))
+    out, hilang = [], []
+    for f in files:
+        m = _NOMOR_RE.match(str(f))
+        if not m or os.path.exists(f):
+            out.append(f)
+            continue
+        a = int(m.group(1))
+        b = int(m.group(2)) if m.group(2) else a
+        langkah = 1 if b >= a else -1
+        for n in range(a, b + langkah, langkah):
+            nama = NOMOR_POLA.format(n)
+            ada = next((Path(d) / nama for d in cari_di if (Path(d) / nama).is_file()),
+                       None)
+            if ada is None:
+                hilang.append(nama)
+            else:
+                out.append(str(ada))
+    if hilang:
+        tempat = " atau ".join(str(d) for d in cari_di)
+        raise SystemExit(f"[ERROR] Tidak ditemukan di {tempat}:\n  "
+                         + "\n  ".join(hilang)
+                         + "\nTulis nomornya satu per satu untuk melompati yang tidak ada.")
+    return out
+
+
 def dedupe_inputs(files: list) -> list:
-    """Buang masukan yang menunjuk file sama, pertahankan urutan aslinya."""
+    """Buang masukan yang menunjuk file sama, pertahankan urutan aslinya.
+
+    Nomor scan (`190-194`, `192`) diluaskan dulu lewat `luaskan_nomor`.
+    """
+    files = luaskan_nomor(files)
     seen = set()
     out = []
     for f in files:
